@@ -6,6 +6,12 @@ struct WeekGrid: View {
     let events: [CalendarEvent]
     let areaFor: (String) -> Area?
 
+    var onOpenEvent: (CalendarEvent) -> Void = { _ in }
+    var onCreateAt: (Date) -> Void = { _ in }
+    var onMoveEvent: (CalendarEvent, Date) -> Void = { _, _ in }
+    var onResizeEvent: (CalendarEvent, Date) -> Void = { _, _ in }
+    var onDropItem: (String, CalendarEvent) -> Void = { _, _ in }
+
     private let hourHeight: CGFloat = 48
     private let gutterWidth: CGFloat = 44
 
@@ -51,7 +57,12 @@ struct WeekGrid: View {
                                     width: colWidth,
                                     hourHeight: hourHeight,
                                     totalHeight: totalHeight,
-                                    areaFor: areaFor
+                                    areaFor: areaFor,
+                                    onOpenEvent: onOpenEvent,
+                                    onCreateAt: onCreateAt,
+                                    onMoveEvent: onMoveEvent,
+                                    onResizeEvent: onResizeEvent,
+                                    onDropItem: onDropItem
                                 )
                             }
                         }
@@ -103,6 +114,12 @@ struct DayColumn: View {
     let totalHeight: CGFloat
     let areaFor: (String) -> Area?
 
+    var onOpenEvent: (CalendarEvent) -> Void
+    var onCreateAt: (Date) -> Void
+    var onMoveEvent: (CalendarEvent, Date) -> Void
+    var onResizeEvent: (CalendarEvent, Date) -> Void
+    var onDropItem: (String, CalendarEvent) -> Void
+
     var body: some View {
         ZStack(alignment: .topLeading) {
             VStack(spacing: 0) {
@@ -114,13 +131,36 @@ struct DayColumn: View {
                 }
             }
             ForEach(layout(), id: \.event.id) { item in
-                EventBlock(event: item.event, area: areaFor(item.event.calendarId), width: itemWidth(item))
-                    .offset(x: itemX(item), y: yOffset(item.event))
-                    .frame(height: eventHeight(item.event))
+                EventBlock(
+                    event: item.event,
+                    area: areaFor(item.event.calendarId),
+                    width: itemWidth(item),
+                    hourHeight: hourHeight,
+                    exceedable: areaFor(item.event.calendarId)?.isClassesCalendar == false,
+                    onOpen: { onOpenEvent(item.event) },
+                    onMove: { newStart in onMoveEvent(item.event, newStart) },
+                    onResize: { newEnd in onResizeEvent(item.event, newEnd) },
+                    onDropItem: { id in onDropItem(id, item.event) }
+                )
+                .offset(x: itemX(item), y: yOffset(item.event))
+                .frame(height: eventHeight(item.event))
             }
         }
         .frame(width: width, height: totalHeight)
         .overlay(alignment: .leading) { Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 0.5) }
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onEnded { value in
+                    onCreateAt(startTime(forY: value.location.y))
+                }
+        )
+    }
+
+    private func startTime(forY y: CGFloat) -> Date {
+        let minutes = max(0, min(24 * 60, y / hourHeight * 60))
+        let rounded = (minutes / 15).rounded() * 15
+        return Calendar.current.date(bySettingHour: Int(rounded) / 60, minute: Int(rounded) % 60, second: 0, of: day) ?? day
     }
 
     private struct LaidOut {
@@ -156,7 +196,7 @@ struct DayColumn: View {
     }
 
     private func eventHeight(_ event: CalendarEvent) -> CGFloat {
-        let mins = max(20, event.end.timeIntervalSince(event.start) / 60)
+        let mins = max(15, event.end.timeIntervalSince(event.start) / 60)
         return max(CGFloat(mins) / 60 * hourHeight, 22)
     }
 }
@@ -165,6 +205,12 @@ struct EventBlock: View {
     let event: CalendarEvent
     let area: Area?
     let width: CGFloat
+    let hourHeight: CGFloat
+    let exceedable: Bool
+    var onOpen: () -> Void
+    var onMove: (Date) -> Void
+    var onResize: (Date) -> Void
+    var onDropItem: (String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
@@ -175,11 +221,38 @@ struct EventBlock: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
+            Spacer(minLength: 0)
         }
         .padding(3)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(RoundedRectangle(cornerRadius: 5).fill(fill))
         .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(stroke, lineWidth: 0.5))
+        .contentShape(Rectangle())
+        .onTapGesture { onOpen() }
+        .dropDestination(for: String.self) { ids, _ in
+            guard exceedable else { return false }
+            for id in ids { onDropItem(id) }
+            return true
+        }
+        .overlay(alignment: .bottom) {
+            if exceedable {
+                Rectangle()
+                    .fill(Color.primary.opacity(0.3))
+                    .frame(height: 3)
+                    .gesture(
+                        DragGesture()
+                            .onEnded { value in
+                                let delta = value.translation.height / hourHeight * 3600
+                                onResize(event.end.addingTimeInterval(delta))
+                            }
+                    )
+            }
+        }
+        .gesture(DragGesture().onEnded { value in
+            guard exceedable else { return }
+            let delta = value.translation.height / hourHeight * 3600
+            onMove(event.start.addingTimeInterval(delta))
+        })
     }
 
     private var fill: Color {

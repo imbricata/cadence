@@ -7,6 +7,9 @@ struct TodayView: View {
     @Environment(GoogleService.self) private var google
     @Query(sort: \Area.sortOrder) private var areas: [Area]
     @State private var date = Date()
+    @State private var blockTarget: BlockSheetTarget?
+    @State private var showNewBlock = false
+    @State private var showUnplanned = false
 
     private var dayEvents: [CalendarEvent] {
         google.events(on: date).sorted { $0.start < $1.start }
@@ -23,6 +26,8 @@ struct TodayView: View {
                     List {
                         ForEach(dayEvents) { event in
                             EventRow(event: event, area: area(for: event))
+                                .contentShape(Rectangle())
+                                .onTapGesture { open(event) }
                         }
                     }
                     .listStyle(.plain)
@@ -34,12 +39,29 @@ struct TodayView: View {
                 ToolbarItem(placement: .topBarLeading) { Button("Today") { date = .now } }
                 ToolbarItem(placement: .topBarLeading) { dayArrow("chevron.right", 1) }
                 ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button { showNewBlock = true } label: { Label("New block", systemImage: "plus") }
+                        Button { showUnplanned = true } label: { Label("Log time", systemImage: "clock.badge.plus") }
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink { SettingsView() } label: { Image(systemName: "gearshape") }
                 }
             }
             .refreshable {
                 await google.refreshEvents(start: windowStart, end: windowEnd)
             }
+        }
+        .sheet(item: $blockTarget) { target in
+            BlockFillLogView(event: target.event, area: target.area)
+        }
+        .sheet(isPresented: $showNewBlock) {
+            NewBlockSheet(initialDate: date, initialStart: date)
+        }
+        .sheet(isPresented: $showUnplanned) {
+            UnplannedLogSheet()
         }
     }
 
@@ -61,6 +83,11 @@ struct TodayView: View {
 
     private func area(for event: CalendarEvent) -> Area? {
         areas.first { !$0.isDeleted && $0.googleCalendarId == event.calendarId }
+    }
+
+    private func open(_ event: CalendarEvent) {
+        guard let area = area(for: event), !area.isClassesCalendar else { return }
+        blockTarget = BlockSheetTarget(id: event.id, event: event, area: area)
     }
 }
 

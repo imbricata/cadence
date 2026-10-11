@@ -30,3 +30,9 @@ struct AreaRow: View {
         }
     }
 }
+
+struct BlockSheetTarget: Identifiable {
+    let id: String
+    let event: CalendarEvent
+    let area: Area
+}

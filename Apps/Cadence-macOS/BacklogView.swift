@@ -65,6 +65,8 @@ struct AreaBacklogSection: View {
                             .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
                     }
                 }
+                .contentShape(Rectangle())
+                .draggable(item.id.uuidString)
             }
             ForEach(activities) { item in
                 HStack(spacing: 6) {
@@ -72,6 +74,8 @@ struct AreaBacklogSection: View {
                     Text(item.title).font(.callout).foregroundStyle(.secondary)
                     Spacer()
                 }
+                .contentShape(Rectangle())
+                .draggable(item.id.uuidString)
             }
         }
     }

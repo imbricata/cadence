@@ -112,16 +112,7 @@ public final class GoogleService {
             for area in active {
                 let list = try await calendar.listEvents(accessToken: token, calendarId: area.googleCalendarId, start: start, end: end)
                 for e in list {
-                    guard let s = e.start?.dateTime.flatMap(GoogleDateFormat.parse) ?? (e.start?.date.flatMap { Self.dateOnly($0) }),
-                          let en = e.end?.dateTime.flatMap(GoogleDateFormat.parse) ?? (e.end?.date.flatMap { Self.dateOnly($0) }) else { continue }
-                    events.append(CalendarEvent(
-                        id: e.id ?? UUID().uuidString,
-                        summary: e.summary ?? "",
-                        start: s, end: en,
-                        calendarId: area.googleCalendarId,
-                        isAllDay: e.start?.date != nil,
-                        isCadenceBlock: e.extendedProperties?.custom?["cadence"] == "1"
-                    ))
+                    if let norm = Self.normalize(e, calendarId: area.googleCalendarId) { events.append(norm) }
                 }
             }
             cachedEvents = events
@@ -135,6 +126,70 @@ public final class GoogleService {
     public func events(on date: Date) -> [CalendarEvent] {
         let day = Calendar.current.dateInterval(of: .day, for: date)!
         return cachedEvents.filter { $0.start < day.end && $0.end > day.start }
+    }
+
+    // MARK: - Block operations (Google events)
+
+    @discardableResult
+    public func createBlock(area: Area, start: Date, end: Date, summary: String? = nil) async -> Bool {
+        guard isAuthorized, !area.googleCalendarId.isEmpty else { return false }
+        do {
+            let token = try await auth.accessToken()
+            let event = try await calendar.createEvent(accessToken: token, calendarId: area.googleCalendarId, summary: summary ?? area.name, start: start, end: end)
+            if let norm = Self.normalize(event, calendarId: area.googleCalendarId) {
+                cachedEvents.append(norm)
+                saveCache()
+            }
+            return true
+        } catch {
+            if let g = error as? GoogleAPIError, g.isAuthError { needsReconnect = true }
+            return false
+        }
+    }
+
+    public func updateBlock(event: CalendarEvent, start: Date?, end: Date?, summary: String?) async {
+        guard isAuthorized else { return }
+        do {
+            let token = try await auth.accessToken()
+            try await calendar.updateEvent(accessToken: token, calendarId: event.calendarId, eventId: event.id, summary: summary, start: start, end: end)
+            if let idx = cachedEvents.firstIndex(where: { $0.id == event.id }) {
+                var e = cachedEvents[idx]
+                if let start { e.start = start }
+                if let end { e.end = end }
+                if let summary { e.summary = summary }
+                cachedEvents[idx] = e
+                saveCache()
+            }
+        } catch {
+            if let g = error as? GoogleAPIError, g.isAuthError { needsReconnect = true }
+        }
+    }
+
+    public func deleteBlock(event: CalendarEvent) async {
+        guard isAuthorized else { return }
+        do {
+            let token = try await auth.accessToken()
+            try await calendar.deleteEvent(accessToken: token, calendarId: event.calendarId, eventId: event.id)
+            cachedEvents.removeAll { $0.id == event.id }
+            saveCache()
+        } catch {
+            if let g = error as? GoogleAPIError, g.isAuthError { needsReconnect = true }
+        }
+    }
+
+    // MARK: - Normalization
+
+    static func normalize(_ e: GoogleEvent, calendarId: String) -> CalendarEvent? {
+        guard let s = e.start?.dateTime.flatMap(GoogleDateFormat.parse) ?? (e.start?.date.flatMap { Self.dateOnly($0) }),
+              let en = e.end?.dateTime.flatMap(GoogleDateFormat.parse) ?? (e.end?.date.flatMap { Self.dateOnly($0) }) else { return nil }
+        return CalendarEvent(
+            id: e.id ?? UUID().uuidString,
+            summary: e.summary ?? "",
+            start: s, end: en,
+            calendarId: calendarId,
+            isAllDay: e.start?.date != nil,
+            isCadenceBlock: e.extendedProperties?.custom?["cadence"] == "1"
+        )
     }
 
     private static func dateOnly(_ s: String) -> Date? {

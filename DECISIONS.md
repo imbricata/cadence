@@ -18,3 +18,10 @@ Every non-obvious choice made while building, one line each. Appended chronologi
 - Drive sync stores one JSON file per model type in `appDataFolder` (areas, items, inbox, blocklogs, blockentries, unplanned, targets). Merge = newest `updatedAt` wins; tombstones propagate deletes and are dropped after 90 days.
 - Drive upload = multipart create (name+parents) for new files, media-only PATCH for updates.
 - Area color writes are pushed to the Google calendar's `backgroundColor` (calendarList) where a calendar is linked; event colorId is left default.
+
+## Blocks (Phase 3)
+
+- Blocks are Google Calendar events: summary = Area name, plus a private extended property `cadence=1` to distinguish blocks from the Classes calendar.
+- Move = drag an area block vertically (same calendar, other day via edit); Resize = drag the block's bottom edge (3pt handle); both map to Calendar event PATCH. Tap empty day space = create a 1-hour block at the tapped 15-min-snapped time (no rubber-band drag-to-create; kept simple).
+- Drag a backlog item onto a block = add it Full with a share of the block's minutes.
+- Logging: block outcome Full/Easy/Skipped + logged minutes + note; each item entry has its own outcome+minutes. Easy minutes are halved. Task Full -> done (completedAt), Easy/Skipped -> stays open (and reopens if previously done).

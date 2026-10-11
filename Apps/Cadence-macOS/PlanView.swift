@@ -4,8 +4,14 @@ import CadenceCore
 
 struct PlanView: View {
     @Environment(GoogleService.self) private var google
+    @Environment(AppStore.self) private var store
     @Query(sort: \Area.sortOrder) private var areas: [Area]
+    @Query private var items: [Item]
+
     @State private var weekAnchor = Date()
+    @State private var showNewBlock = false
+    @State private var newBlockStart = Date()
+    @State private var blockTarget: BlockSheetTarget?
 
     var body: some View {
         Group {
@@ -13,10 +19,21 @@ struct PlanView: View {
                 ConnectGooglePlaceholder()
             } else {
                 HStack(spacing: 0) {
-                    VStack(spacing: 0) {
-                        WeekGrid(week: weekAnchor, events: google.cachedEvents, areaFor: areaFor)
-                        Divider()
-                    }
+                    WeekGrid(
+                        week: weekAnchor,
+                        events: google.cachedEvents,
+                        areaFor: areaFor,
+                        onOpenEvent: openEvent,
+                        onCreateAt: requestCreate,
+                        onMoveEvent: { event, newStart in
+                            let dur = event.end.timeIntervalSince(event.start)
+                            Task { await google.updateBlock(event: event, start: newStart, end: newStart.addingTimeInterval(dur), summary: nil) }
+                        },
+                        onResizeEvent: { event, newEnd in
+                            Task { await google.updateBlock(event: event, start: nil, end: newEnd, summary: nil) }
+                        },
+                        onDropItem: dropItem
+                    )
                     Divider()
                     BacklogView()
                         .frame(width: 300)
@@ -32,9 +49,18 @@ struct PlanView: View {
                 Button { Task { await syncAndRefresh() } } label: {
                     Image(systemName: "arrow.clockwise")
                 }
+                Button { requestCreate(.now) } label: {
+                    Image(systemName: "plus")
+                }
             }
         }
         .onAppear { Task { await syncAndRefresh() } }
+        .sheet(isPresented: $showNewBlock) {
+            NewBlockSheet(initialDate: newBlockStart, initialStart: newBlockStart)
+        }
+        .sheet(item: $blockTarget) { target in
+            BlockFillLogView(event: target.event, area: target.area)
+        }
     }
 
     private var navTitle: String {
@@ -49,6 +75,23 @@ struct PlanView: View {
 
     private func areaFor(_ calendarId: String) -> Area? {
         areas.first { !$0.isDeleted && $0.googleCalendarId == calendarId }
+    }
+
+    private func openEvent(_ event: CalendarEvent) {
+        guard let area = areaFor(event.calendarId), !area.isClassesCalendar else { return }
+        blockTarget = BlockSheetTarget(id: event.id, event: event, area: area)
+    }
+
+    private func requestCreate(_ start: Date) {
+        newBlockStart = start
+        showNewBlock = true
+    }
+
+    private func dropItem(_ itemId: String, _ event: CalendarEvent) {
+        guard let area = areaFor(event.calendarId), !area.isClassesCalendar,
+              let item = items.first(where: { $0.id.uuidString == itemId && !$0.isDeleted }) else { return }
+        let planned = max(1, Int(event.end.timeIntervalSince(event.start) / 60))
+        addItemToBlock(store, item: item, googleEventId: event.id, eventStart: event.start, areaId: area.id, plannedMinutes: planned)
     }
 
     private func syncAndRefresh() async {
