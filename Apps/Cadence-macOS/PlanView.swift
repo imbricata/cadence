@@ -55,6 +55,11 @@ struct PlanView: View {
             }
         }
         .onAppear { Task { await syncAndRefresh() } }
+        .onReceive(NotificationCenter.default.publisher(for: .commandNewBlock)) { _ in requestCreate(.now) }
+        .onReceive(NotificationCenter.default.publisher(for: .commandPrevDay)) { _ in shiftWeek(-1) }
+        .onReceive(NotificationCenter.default.publisher(for: .commandNextDay)) { _ in shiftWeek(1) }
+        .onReceive(NotificationCenter.default.publisher(for: .commandToday)) { _ in weekAnchor = .now }
+        .onReceive(NotificationCenter.default.publisher(for: .commandSync)) { _ in Task { await syncAndRefresh() } }
         .sheet(isPresented: $showNewBlock) {
             NewBlockSheet(initialDate: newBlockStart, initialStart: newBlockStart)
         }

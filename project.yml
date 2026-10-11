@@ -29,6 +29,8 @@ targets:
       - path: Apps/Shared
     dependencies:
       - package: CadenceCore
+      - target: CadenceWidgets
+        embed: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cadence.ios
@@ -49,6 +51,24 @@ targets:
           - CFBundleURLName: com.cadence.oauth
             CFBundleURLSchemes:
               - cadence
+
+  CadenceWidgets:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: Apps/CadenceWidgets
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cadence.ios.widgets
+        PRODUCT_NAME: CadenceWidgets
+        SKIP_INSTALL: YES
+    info:
+      path: Apps/CadenceWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Cadence
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
 
   CadenceMac:
     type: application
@@ -93,6 +113,7 @@ schemes:
     build:
       targets:
         CadenceiOS: all
+        CadenceWidgets: all
     run:
       config: Debug
   CadenceMac:

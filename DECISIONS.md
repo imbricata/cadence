@@ -44,3 +44,11 @@ Every non-obvious choice made while building, one line each. Appended chronologi
 ## Design (visual approach)
 
 - Native materials, no gradients/emoji/illustrations. Color comes only from the 10 muted Area palette via small dots, thin bars, and translucent block fills; everything else neutral. Monospaced digits for numbers. Calm one-line empty states. Subtle rounded cards (secondary.opacity(0.06)) for Insight groups.
+
+## Widgets & polish (Phase 6)
+
+- Only the Capture widget (systemSmall + lock-screen accessory), which just deep-links `cadence://capture` and needs no shared data. The "Next-block" widget is skipped because it needs App Groups + App Intents, which are not reliably available on a free Personal Team (per SPEC Section 1).
+- Widget bundle id is `com.cadence.ios.widgets` (must inherit the parent app id).
+- Mac keyboard shortcuts via a Commands menu: Cmd+N new note, Cmd+Shift+B new block, Cmd+Left/Right previous/next day, Cmd+T today, Cmd+S sync.
+- JSON export reuses the sync snapshot structs (pretty-printed, ISO-8601 dates) and uses SwiftUI `.fileExporter`.
+- Bundle ids fixed as: iOS `com.cadence.ios`, macOS `com.cadence.mac`, widget `com.cadence.ios.widgets`.

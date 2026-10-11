@@ -6,6 +6,7 @@ struct SettingsView: View {
         Form {
             GoogleSettingsSection()
             InboxSettingsSection()
+            ExportSection()
             Section("About") {
                 LabeledContent("Version", value: "0.1.0")
             }

@@ -3,7 +3,7 @@ import SwiftData
 
 // MARK: - Sync record protocol
 
-public protocol SyncRecord: Codable {
+public protocol SyncRecord: Codable, Sendable {
     var id: UUID { get }
     var updatedAt: Date { get }
     var isDeleted: Bool { get }

@@ -48,6 +48,9 @@ struct RootView: View {
                 Task { await refresh() }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .commandNewNote)) { _ in
+            selection = .inbox
+        }
     }
 
     private func refresh() async {

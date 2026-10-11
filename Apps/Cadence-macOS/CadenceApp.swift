@@ -33,5 +33,8 @@ struct CadenceApp: App {
                 .environment(inbox)
                 .modelContainer(store.container)
         }
+        .commands {
+            CadenceCommands()
+        }
     }
 }

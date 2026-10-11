@@ -39,7 +39,9 @@ struct InboxView: View {
             .navigationTitle("Inbox")
             .safeAreaInset(edge: .bottom) { composer }
             .onAppear { Task { await inbox.processPending() } }
-            .defaultFocus($focused, true)
+            .onReceive(NotificationCenter.default.publisher(for: .openCapture)) { _ in
+                focused = true
+            }
         }
     }
 
