@@ -48,4 +48,38 @@ final class ScoringTests: XCTestCase {
         XCTAssertEqual(level(forHours: 250), 5)
         XCTAssertEqual(level(forHours: 1000), 7)
     }
+
+    func testFollowThroughPercent() {
+        XCTAssertEqual(followThroughPercent(planned: 4, loggedWeight: 3)!, 75, accuracy: 0.001)
+        XCTAssertEqual(followThroughPercent(planned: 0, loggedWeight: 0), nil)
+        XCTAssertEqual(followThroughPercent(planned: 2, loggedWeight: 0)!, 0, accuracy: 0.001)
+    }
+
+    func testBlockLogWeight() {
+        XCTAssertEqual(blockLogWeight(.full), 1.0)
+        XCTAssertEqual(blockLogWeight(.easy), 0.75, accuracy: 0.001)
+        XCTAssertEqual(blockLogWeight(.skipped), 0)
+        XCTAssertEqual(blockLogWeight(.unlogged), 0)
+    }
+
+    func testTotalHours() {
+        XCTAssertEqual(totalHours(minutes: 63), 1.05, accuracy: 0.001)
+        XCTAssertEqual(totalHours(minutes: 0), 0)
+    }
+
+    func testProposeTargetMedian() {
+        XCTAssertEqual(proposeTarget(weeklyMinutes: [100, 120, 90]), 100)
+        XCTAssertEqual(proposeTarget(weeklyMinutes: [100, 120]), 110)
+        XCTAssertNil(proposeTarget(weeklyMinutes: []))
+    }
+
+    func testDaysObserved() {
+        let cal = Calendar.current
+        let first = cal.date(byAdding: .day, value: -20, to: .now)!
+        XCTAssertEqual(daysObserved(firstDate: first), 20)
+    }
+
+    func testFormReturnsNilWhenNoReference() {
+        XCTAssertNil(formPercentage(recent: 50, reference: 0, daysObserved: 30, hasTarget: false))
+    }
 }

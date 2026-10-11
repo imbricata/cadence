@@ -20,6 +20,7 @@ struct AreaColorDot: View {
 
 struct AreaRow: View {
     let area: Area
+    var formPercent: Double? = nil
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: area.symbolName)
@@ -27,6 +28,7 @@ struct AreaRow: View {
                 .foregroundStyle(Color(hex: area.colorHex))
             Text(area.name)
                 .frame(maxWidth: .infinity, alignment: .leading)
+            FormLabel(percent: formPercent)
         }
     }
 }

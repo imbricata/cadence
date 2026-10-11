@@ -32,3 +32,15 @@ Every non-obvious choice made while building, one line each. Appended chronologi
 - API key lives in the Keychain (service `com.cadence.openrouter`); model id + monthly cap live in UserDefaults. Cost is estimated from reported token usage against a rough price table (documented as estimates).
 - When the sorter matches an existing activity (`matchesExistingActivityId`), the note links to that Activity and no duplicate is created.
 - Invalid output -> retry once -> then counted as a failure; 3 failures -> `failed` (offers "Sort manually"). Raw text is always hidden and cleared 30 days after a successful sort.
+
+## Scores (Phase 5)
+
+- All scoring constants live in `ScoringConfig` (7/28-day half-lives, form cap 200%, 14-day calibration, easy weight 0.75, 7-day follow-through, 21-day target proposal, level thresholds 10/25/50/100/250/500/1000 h).
+- Easy minutes are stored as actual logged minutes; form applies the x0.75 weight only when scoring (so "hours" and "levels" use real time).
+- Form reference = target weekly/7 once set, otherwise the baseline (28-day EW daily average). Before 14 observed days with no target, form shows "Calibrating" (nil).
+- Target proposal = median of observed ISO-week minute totals; shown once per area (UserDefaults flag).
+- Follow-through planned count comes from cached non-class events plus any local block logs in the last 7 days (union keyed by event id); logged weight from the matching block log state.
+
+## Design (visual approach)
+
+- Native materials, no gradients/emoji/illustrations. Color comes only from the 10 muted Area palette via small dots, thin bars, and translucent block fills; everything else neutral. Monospaced digits for numbers. Calm one-line empty states. Subtle rounded cards (secondary.opacity(0.06)) for Insight groups.

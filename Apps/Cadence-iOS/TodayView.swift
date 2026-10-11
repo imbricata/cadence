@@ -6,6 +6,9 @@ struct TodayView: View {
     @Environment(AppStore.self) private var store
     @Environment(GoogleService.self) private var google
     @Query(sort: \Area.sortOrder) private var areas: [Area]
+    @Query private var items: [Item]
+    @Query private var blockLogs: [BlockLog]
+    @Query private var entries: [BlockEntry]
     @State private var date = Date()
     @State private var blockTarget: BlockSheetTarget?
     @State private var showNewBlock = false
@@ -13,6 +16,11 @@ struct TodayView: View {
 
     private var dayEvents: [CalendarEvent] {
         google.events(on: date).sorted { $0.start < $1.start }
+    }
+
+    private var followThrough: Double? {
+        _ = (areas, items, blockLogs, entries)
+        return computeInsights(context: store.context, events: google.cachedEvents).followThrough.percent
     }
 
     var body: some View {
@@ -24,6 +32,15 @@ struct TodayView: View {
                     ContentUnavailableView("Nothing planned", systemImage: "calendar", description: Text("This day is clear."))
                 } else {
                     List {
+                        if let ft = followThrough {
+                            Section {
+                                HStack {
+                                    Text("Follow-through · 7 days").font(.footnote).foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text("\(Int(ft.rounded()))%").font(.footnote).monospacedDigit().foregroundStyle(.secondary)
+                                }
+                            }
+                        }
                         ForEach(dayEvents) { event in
                             EventRow(event: event, area: area(for: event))
                                 .contentShape(Rectangle())

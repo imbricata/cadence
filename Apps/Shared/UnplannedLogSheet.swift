@@ -70,7 +70,7 @@ struct UnplannedLogSheet: View {
     private func save() {
         guard let areaId else { return }
         addUnplannedLog(store, areaId: areaId, itemId: itemId, date: date, outcome: outcome,
-                        minutes: outcome == .easy ? max(0, minutes / 2) : minutes, note: note.isEmpty ? nil : note)
+                        minutes: minutes, note: note.isEmpty ? nil : note)
         if let itemId {
             applyOutcomeToTask(store, itemId: itemId, outcome: outcome)
         }

@@ -170,8 +170,7 @@ struct BlockFillLogView: View {
             existing.updatedAt = .now
         }
         for entry in entries {
-            let mins = entry.outcome == .easy ? max(0, entry.minutes / 2) : entry.minutes
-            upsertEntry(store, blockLogId: log.id, itemId: entry.item.id, outcome: entry.outcome, minutes: mins)
+            upsertEntry(store, blockLogId: log.id, itemId: entry.item.id, outcome: entry.outcome, minutes: entry.minutes)
             applyOutcomeToTask(store, itemId: entry.item.id, outcome: entry.outcome)
         }
         store.save()

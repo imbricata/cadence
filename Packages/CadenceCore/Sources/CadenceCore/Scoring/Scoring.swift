@@ -47,3 +47,39 @@ public func level(forHours hours: Double) -> Int {
 public func levelLabel(hours: Double, levelIndex: Int) -> String {
     "Level \(levelIndex)"
 }
+
+/// Follow-through percent = weighted logged blocks / planned blocks, as a percentage.
+public func followThroughPercent(planned: Int, loggedWeight: Double) -> Double? {
+    guard planned > 0 else { return nil }
+    return min(100.0, max(0, loggedWeight) / Double(planned) * 100)
+}
+
+/// Weighted score of a block's log: full = 1, easy = 0.75, else 0.
+public func blockLogWeight(_ state: BlockLogState) -> Double {
+    switch state {
+    case .full: return 1.0
+    case .easy: return 0.75
+    case .unlogged, .skipped: return 0
+    }
+}
+
+public func totalHours(minutes: Int) -> Double {
+    Double(max(0, minutes)) / 60
+}
+
+/// Median of observed weekly minute totals (used for target proposals).
+public func proposeTarget(weeklyMinutes: [Int]) -> Int? {
+    let values = weeklyMinutes.filter { $0 >= 0 }
+    guard !values.isEmpty else { return nil }
+    let sorted = values.sorted()
+    let mid = sorted.count / 2
+    if sorted.count % 2 == 0 {
+        return (sorted[mid - 1] + sorted[mid]) / 2
+    }
+    return sorted[mid]
+}
+
+/// Whole days since the first observation (or the area's creation) for calibration.
+public func daysObserved(firstDate: Date, now: Date = .now) -> Int {
+    max(0, Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: firstDate), to: Calendar.current.startOfDay(for: now)).day ?? 0)
+}

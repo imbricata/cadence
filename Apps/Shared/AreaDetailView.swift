@@ -4,9 +4,12 @@ import CadenceCore
 
 struct AreaDetailView: View {
     @Environment(AppStore.self) private var store
+    @Environment(GoogleService.self) private var google
     let area: Area
 
     @Query private var items: [Item]
+    @Query private var blockLogs: [BlockLog]
+    @Query private var entries: [BlockEntry]
     @State private var showingItems = false
     @State private var showingEdit = false
     @State private var editingItem: Item?
@@ -19,15 +22,44 @@ struct AreaDetailView: View {
     }
     private var doneTasks: [Item] { areaItems.filter { $0.kind == .task && $0.status != .open } }
 
+    private var snapshot: InsightSnapshot {
+        _ = (items, blockLogs, entries)
+        return computeInsights(context: store.context, events: google.cachedEvents)
+    }
+    private var areaStat: AreaStat? { snapshot.areas.first { $0.areaId == area.id } }
+
     var body: some View {
         List {
+            if let stat = areaStat {
+                Section {
+                    HStack {
+                        Text("Form").foregroundStyle(.secondary)
+                        Spacer()
+                        FormLabel(percent: stat.formPercent)
+                    }
+                    HStack {
+                        Text("Hours").foregroundStyle(.secondary)
+                        Spacer()
+                        Text(String(format: "%.1f", totalHours(minutes: stat.rawMinutes))).monospacedDigit()
+                    }
+                }
+            }
+
             if !activities.isEmpty {
                 Section("Activities") {
                     ForEach(activities) { item in
                         HStack {
-                            Text(item.title)
+                            VStack(alignment: .leading) {
+                                Text(item.title)
+                                if let act = snapshot.activities.first(where: { $0.itemId == item.id }) {
+                                    Text("\(String(format: "%.1f h", totalHours(minutes: act.rawMinutes))) · \(levelLabel(hours: totalHours(minutes: act.rawMinutes), levelIndex: act.level))")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
                             Spacer()
                             Button { selected(item, .activity) } label: { Image(systemName: "pencil") }
+                                .buttonStyle(.borderless)
                         }
                     }
                 }
@@ -36,15 +68,14 @@ struct AreaDetailView: View {
                 Section("Open tasks") {
                     ForEach(openTasks) { item in
                         HStack {
-                            Button { markDone(item) } label: {
-                                Image(systemName: "circle")
-                            }
+                            Button { markDone(item) } label: { Image(systemName: "circle") }
                             VStack(alignment: .leading) {
                                 Text(item.title)
                                 if let d = item.dueDate { Text(d, format: .dateTime.day().month()).font(.caption).foregroundStyle(.secondary) }
                             }
                             Spacer()
                             Button { selected(item, .task) } label: { Image(systemName: "pencil") }
+                                .buttonStyle(.borderless)
                         }
                     }
                 }
@@ -52,11 +83,15 @@ struct AreaDetailView: View {
             if !doneTasks.isEmpty {
                 Section("Done") {
                     ForEach(doneTasks) { item in
-                        Text(item.title).foregroundStyle(.secondary)
+                        Text(item.title)
+                            .foregroundStyle(.secondary)
                             .swipeActions { Button("Reopen") { reopen(item) } }
+                            .contextMenu { Button("Reopen") { reopen(item) } }
                     }
                 }
             }
+
+            TargetSection(area: area, daysObserved: areaStat?.daysObserved ?? 0, hasTarget: areaStat?.hasTarget ?? false, targetWeeklyMinutes: areaStat?.targetWeeklyMinutes)
         }
         .navigationTitle(area.name)
         .toolbar {
