@@ -1,0 +1,112 @@
+name: Cadence
+options:
+  bundleIdPrefix: com.cadence
+  createIntermediateGroups: true
+  deploymentTarget:
+    iOS: "26.0"
+    macOS: "26.0"
+
+configFiles:
+  Debug: Secrets.xcconfig
+  Release: Secrets.xcconfig
+
+packages:
+  CadenceCore:
+    path: Packages/CadenceCore
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    CODE_SIGN_STYLE: Automatic
+
+targets:
+  CadenceiOS:
+    type: application
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: Apps/Cadence-iOS
+      - path: Apps/Shared
+    dependencies:
+      - package: CadenceCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cadence.ios
+        PRODUCT_NAME: Cadence
+        TARGETED_DEVICE_FAMILY: "1,2"
+    info:
+      path: Apps/Cadence-iOS/Info.plist
+      properties:
+        CFBundleDisplayName: Cadence
+        CFBundleName: Cadence
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        GoogleClientID: $(GOOGLE_IOS_CLIENT_ID)
+        CFBundleURLTypes:
+          - CFBundleURLName: com.cadence.oauth
+            CFBundleURLSchemes:
+              - cadence
+
+  CadenceMac:
+    type: application
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: Apps/Cadence-macOS
+      - path: Apps/Shared
+    dependencies:
+      - package: CadenceCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cadence.mac
+        PRODUCT_NAME: Cadence
+    info:
+      path: Apps/Cadence-macOS/Info.plist
+      properties:
+        CFBundleDisplayName: Cadence
+        CFBundleName: Cadence
+        NSHumanReadableCopyright: ""
+        GoogleClientID: $(GOOGLE_MAC_CLIENT_ID)
+        CFBundleURLTypes:
+          - CFBundleURLName: com.cadence.oauth
+            CFBundleURLSchemes:
+              - cadence
+
+  CadenceCoreTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: Tests
+    dependencies:
+      - package: CadenceCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cadence.coretests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  CadenceiOS:
+    build:
+      targets:
+        CadenceiOS: all
+    run:
+      config: Debug
+  CadenceMac:
+    build:
+      targets:
+        CadenceMac: all
+    run:
+      config: Debug
+  CadenceCoreTests:
+    build:
+      targets:
+        CadenceCoreTests: [test]
+    test:
+      config: Debug
+      gatherCoverageData: false
+      targets:
+        - CadenceCoreTests

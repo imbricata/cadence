@@ -1,0 +1,24 @@
+# Xcode
+build/
+DerivedData/
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+.DS_Store
+
+# Secrets
+Secrets.xcconfig
+
+# Generated Info.plists (XcodeGen `info:`)
+Apps/**/Info.plist
+
+# Swift Package Manager
+.build/
+Packages/**/.build/
+.swiftpm/
+Package.resolved
+
+# macOS
+*.dSYM
