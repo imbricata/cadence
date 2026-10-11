@@ -23,8 +23,12 @@ public enum GoogleAuthError: Error, LocalizedError {
 }
 
 public enum GoogleAuthConfig {
-    public static let redirectURI = "cadence://oauth2redirect"
-    public static let callbackScheme = "cadence"
+    /// iOS-type OAuth clients redirect to the reversed client ID scheme.
+    public static var reversedClientID: String {
+        clientID.split(separator: ".").reversed().joined(separator: ".")
+    }
+    public static var redirectURI: String { "\(reversedClientID):/oauth2redirect" }
+    public static var callbackScheme: String { reversedClientID }
     public static let scopes = [
         "https://www.googleapis.com/auth/calendar",
         "https://www.googleapis.com/auth/drive.appdata"

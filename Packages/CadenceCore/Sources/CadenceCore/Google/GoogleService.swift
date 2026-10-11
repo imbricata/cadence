@@ -33,7 +33,8 @@ public final class GoogleService {
 
     public func signIn() async {
         do { try await auth.authorize(); needsReconnect = false }
-        catch { needsReconnect = true }
+        catch { needsReconnect = true; return }
+        for area in visibleAreas(in: store.context) { await ensureCalendar(for: area) }
     }
 
     public func signOut() {
@@ -55,7 +56,7 @@ public final class GoogleService {
         } catch {
             if let g = error as? GoogleAPIError, g.isAuthError {
                 needsReconnect = true
-            } else if error is DriveAPIError {
+            } else if error is DriveAPIError || error is GoogleAuthError {
                 needsReconnect = true
             }
         }

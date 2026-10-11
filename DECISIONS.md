@@ -13,7 +13,7 @@ Every non-obvious choice made while building, one line each. Appended chronologi
 - Updated-At is set explicitly in the store layer on every mutation (not via model machinery), keeping sync semantics predictable.
 ## Google (Phase 2)
 
-- OAuth uses `ASWebAuthenticationSession` + PKCE (S256), no Google SDK/SPM dependency. Requires one "Web application" OAuth client with redirect `cadence://oauth2redirect`; the same client ID works for both apps (still two xcconfig keys).
+- OAuth uses `ASWebAuthenticationSession` + PKCE (no Google SDK). Two iOS-type OAuth clients (bundle ids com.cadence.ios / com.cadence.mac); redirect is the reversed client id `com.googleusercontent.apps.<id>:/oauth2redirect` (Google rejects custom schemes on Web clients). The session intercepts the callback itself, so no Info.plist URL scheme is needed for auth.
 - Google Calendar events are fetched as a rolling ~window (no `syncToken`); cached to a JSON file on disk for offline viewing. Token kept in the macOS/iOS Keychain and refreshed before expiry.
 - Drive sync stores one JSON file per model type in `appDataFolder` (areas, items, inbox, blocklogs, blockentries, unplanned, targets). Merge = newest `updatedAt` wins; tombstones propagate deletes and are dropped after 90 days.
 - Drive upload = multipart create (name+parents) for new files, media-only PATCH for updates.
@@ -52,3 +52,4 @@ Every non-obvious choice made while building, one line each. Appended chronologi
 - Mac keyboard shortcuts via a Commands menu: Cmd+N new note, Cmd+Shift+B new block, Cmd+Left/Right previous/next day, Cmd+T today, Cmd+S sync.
 - JSON export reuses the sync snapshot structs (pretty-printed, ISO-8601 dates) and uses SwiftUI `.fileExporter`.
 - Bundle ids fixed as: iOS `com.cadence.ios`, macOS `com.cadence.mac`, widget `com.cadence.ios.widgets`.
+- Review fixes: the calendar list includes read-only calendars (so a subscribed college calendar shows up); creating an area auto-creates its Google calendar (also for existing areas on sign-in); rename/recolor pushes to Google.

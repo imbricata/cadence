@@ -17,12 +17,11 @@ Do these steps by hand, in order. Anything you skip will show up as "not connect
    - User type: **External**.
    - App name "Cadence", your email as support email.
    - Add your own Google account as a **test user** while in "Testing" mode (you can switch to "In production" once it works).
-6. Create an OAuth client (APIs & Services → Credentials → Create credentials → OAuth client ID):
-   - Application type: **Web application**.
-   - Name: "Cadence".
-   - Authorized redirect URI: exactly `cadence://oauth2redirect`
-   - Leave "Client secret" blank — Cadence uses PKCE and does not use a secret.
-7. Copy the resulting **Client ID**. On the consent screen, switch publishing status to **In production** (the two scopes used — `calendar` and `drive.appdata` — are non-sensitive, so this needs no Google review).
+6. Create two OAuth clients (APIs & Services → Credentials → Create credentials → OAuth client ID), both of application type **iOS**:
+   - "Cadence iPhone" — Bundle ID `com.cadence.ios`
+   - "Cadence Mac" — Bundle ID `com.cadence.mac` (Google uses the iOS client type for native Mac apps too)
+   - No redirect URI or secret to configure: iOS clients automatically allow `com.googleusercontent.apps.<id>:/oauth2redirect`, which Cadence uses with PKCE.
+7. Copy both **Client IDs**. On the consent screen (Audience), switch publishing status to **In production** — in Testing mode, Google expires refresh tokens after 7 days. The `calendar` scope is classed as sensitive, so on first sign-in Google shows "Google hasn't verified this app": tap **Advanced → Go to Cadence (unsafe)**. That's expected for a personal, unverified app; no review is needed.
 
 ## 3. Secrets
 
@@ -30,7 +29,7 @@ Do these steps by hand, in order. Anything you skip will show up as "not connect
    ```
    cp Secrets.example.xcconfig Secrets.xcconfig
    ```
-9. Paste the Client ID into **both** `GOOGLE_IOS_CLIENT_ID` and `GOOGLE_MAC_CLIENT_ID` in `Secrets.xcconfig`.
+9. Paste the iPhone client ID into `GOOGLE_IOS_CLIENT_ID` and the Mac client ID into `GOOGLE_MAC_CLIENT_ID`.
 
 `Secrets.xcconfig` is git-ignored and never committed.
 
@@ -44,7 +43,7 @@ Do these steps by hand, in order. Anything you skip will show up as "not connect
 12. For the **CadenceiOS** target: Signing & Capabilities → check "Automatically manage signing", select your **Personal Team**.
 13. Do the same for **CadenceWidgets** (the widget extension).
 14. For the **CadenceMac** target, select your Personal Team.
-15. Change the bundle identifiers if you prefer (defaults: `com.cadence.ios`, `com.cadence.ios.widgets`, `com.cadence.mac`) — but **fix them once** and never change them again, because a free Personal Team can only register a few App IDs per week.
+15. Keep the bundle identifiers as-is (`com.cadence.ios`, `com.cadence.ios.widgets`, `com.cadence.mac`). They must match the Google OAuth clients, and a free Personal Team can only register a few App IDs per week, so don't change them. If Xcode says an ID is taken, change the prefix once everywhere (project.yml + both Google clients) and run `xcodegen generate` again.
 
 ## 6. Run
 
@@ -55,7 +54,7 @@ Do these steps by hand, in order. Anything you skip will show up as "not connect
 
 18. In the app, open **Settings** → tap **Connect Google Calendar** and approve the scopes.
 19. Still in Settings, pick your college calendar as the **Classes calendar**.
-20. Open **Areas**, create your areas (each creates a linked Google calendar named after it) or link existing ones in Settings.
+20. Open **Areas** → **+** to create your areas. Each new area creates its own Google calendar named after it. Renaming or recoloring an area also updates that calendar. (Linking an *existing* calendar to an area is not built yet.)
 21. Open **Settings** → enter your **OpenRouter** API key (from https://openrouter.ai/keys) and optionally set the model + monthly cap.
 
 ## 8. Keeping it running

@@ -3,6 +3,7 @@ import CadenceCore
 
 struct AreaEditorView: View {
     @Environment(AppStore.self) private var store
+    @Environment(GoogleService.self) private var google
     @Environment(\.dismiss) private var dismiss
     let area: Area?
 
@@ -64,8 +65,10 @@ struct AreaEditorView: View {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
         if let area {
             updateArea(store, area, name: trimmed, colorHex: colorHex, symbolName: symbolName)
+            Task { await google.applyAreaAppearance(area) }
         } else {
-            createArea(store, name: trimmed, colorHex: colorHex, symbolName: symbolName)
+            let new = createArea(store, name: trimmed, colorHex: colorHex, symbolName: symbolName)
+            Task { await google.ensureCalendar(for: new) }
         }
         dismiss()
     }

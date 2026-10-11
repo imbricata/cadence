@@ -59,7 +59,7 @@ public struct GoogleCalendarAPI: Sendable {
     // MARK: Calendars
 
     public func listCalendars(accessToken: String) async throws -> [GoogleCalendar] {
-        let data = try await request("/users/me/calendarList", token: accessToken, query: [("minAccessRole", "writer")])
+        let data = try await request("/users/me/calendarList", token: accessToken)
         let list = try decode(GoogleCalendarList.self, data)
         return list.items
     }
