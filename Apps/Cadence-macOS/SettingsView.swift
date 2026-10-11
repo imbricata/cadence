@@ -5,6 +5,7 @@ struct SettingsView: View {
     var body: some View {
         Form {
             GoogleSettingsSection()
+            InboxSettingsSection()
             Section("About") {
                 LabeledContent("Version", value: "0.1.0")
             }

@@ -25,3 +25,10 @@ Every non-obvious choice made while building, one line each. Appended chronologi
 - Move = drag an area block vertically (same calendar, other day via edit); Resize = drag the block's bottom edge (3pt handle); both map to Calendar event PATCH. Tap empty day space = create a 1-hour block at the tapped 15-min-snapped time (no rubber-band drag-to-create; kept simple).
 - Drag a backlog item onto a block = add it Full with a share of the block's minutes.
 - Logging: block outcome Full/Easy/Skipped + logged minutes + note; each item entry has its own outcome+minutes. Easy minutes are halved. Task Full -> done (completedAt), Easy/Skipped -> stays open (and reopens if previously done).
+
+## Inbox + AI (Phase 4)
+
+- OpenRouter structured output via `response_format: json_schema` (strict), `temperature 0`, `max_tokens 150`, plus the `models` fallback array. Reasoning is left off by default (no reasoning field sent).
+- API key lives in the Keychain (service `com.cadence.openrouter`); model id + monthly cap live in UserDefaults. Cost is estimated from reported token usage against a rough price table (documented as estimates).
+- When the sorter matches an existing activity (`matchesExistingActivityId`), the note links to that Activity and no duplicate is created.
+- Invalid output -> retry once -> then counted as a failure; 3 failures -> `failed` (offers "Sort manually"). Raw text is always hidden and cleared 30 days after a successful sort.

@@ -6,11 +6,13 @@ import CadenceCore
 struct CadenceApp: App {
     @State private var store: AppStore
     @State private var google: GoogleService
+    @State private var inbox: InboxService
 
     init() {
         let s = try! AppStore.live()
         _store = State(initialValue: s)
         _google = State(initialValue: GoogleService(store: s))
+        _inbox = State(initialValue: InboxService(store: s))
     }
 
     var body: some Scene {
@@ -18,6 +20,7 @@ struct CadenceApp: App {
             RootView()
                 .environment(store)
                 .environment(google)
+                .environment(inbox)
                 .modelContainer(store.container)
         }
     }
