@@ -11,3 +11,10 @@ Every non-obvious choice made while building, one line each. Appended chronologi
 - Enums are stored directly on `@Model`s as `String, Codable` raw-enums (SwiftData persists Codable raw enums); JSON sync encodes them to strings.
 - Area palette: 10 muted hex colors (see `AreaPalette`); Area stores a hex string, UI interprets with `Color(hex:)`.
 - Updated-At is set explicitly in the store layer on every mutation (not via model machinery), keeping sync semantics predictable.
+## Google (Phase 2)
+
+- OAuth uses `ASWebAuthenticationSession` + PKCE (S256), no Google SDK/SPM dependency. Requires one "Web application" OAuth client with redirect `cadence://oauth2redirect`; the same client ID works for both apps (still two xcconfig keys).
+- Google Calendar events are fetched as a rolling ~window (no `syncToken`); cached to a JSON file on disk for offline viewing. Token kept in the macOS/iOS Keychain and refreshed before expiry.
+- Drive sync stores one JSON file per model type in `appDataFolder` (areas, items, inbox, blocklogs, blockentries, unplanned, targets). Merge = newest `updatedAt` wins; tombstones propagate deletes and are dropped after 90 days.
+- Drive upload = multipart create (name+parents) for new files, media-only PATCH for updates.
+- Area color writes are pushed to the Google calendar's `backgroundColor` (calendarList) where a calendar is linked; event colorId is left default.

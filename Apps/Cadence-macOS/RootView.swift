@@ -23,6 +23,8 @@ enum SidebarSection: String, CaseIterable, Identifiable {
 }
 
 struct RootView: View {
+    @Environment(GoogleService.self) private var google
+    @Environment(\.scenePhase) private var scenePhase
     @State private var selection: SidebarSection? = .plan
 
     var body: some View {
@@ -41,5 +43,16 @@ struct RootView: View {
             case .none: Text("Select a section")
             }
         }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                Task { await refresh() }
+            }
+        }
+    }
+
+    private func refresh() async {
+        await google.syncNow()
+        let day = Calendar.current.dateInterval(of: .day, for: .now)!
+        await google.refreshEvents(start: day.start, end: day.end.addingTimeInterval(28 * 24 * 3600))
     }
 }
