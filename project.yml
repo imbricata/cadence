@@ -1,6 +1,6 @@
 name: Cadence
 options:
-  bundleIdPrefix: com.cadence
+  bundleIdPrefix: com.theocoronges
   createIntermediateGroups: true
   deploymentTarget:
     iOS: "26.0"
@@ -33,7 +33,7 @@ targets:
         embed: true
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.cadence.ios
+        PRODUCT_BUNDLE_IDENTIFIER: com.theocoronges.cadence
         PRODUCT_NAME: Cadence
         TARGETED_DEVICE_FAMILY: "1,2"
     info:
@@ -48,7 +48,7 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         GoogleClientID: $(GOOGLE_IOS_CLIENT_ID)
         CFBundleURLTypes:
-          - CFBundleURLName: com.cadence.oauth
+          - CFBundleURLName: com.theocoronges.cadence.oauth
             CFBundleURLSchemes:
               - cadence
 
@@ -60,7 +60,7 @@ targets:
       - path: Apps/CadenceWidgets
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.cadence.ios.widgets
+        PRODUCT_BUNDLE_IDENTIFIER: com.theocoronges.cadence.widgets
         PRODUCT_NAME: CadenceWidgets
         SKIP_INSTALL: YES
     info:
@@ -81,7 +81,7 @@ targets:
       - package: CadenceCore
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.cadence.mac
+        PRODUCT_BUNDLE_IDENTIFIER: com.theocoronges.cadence.mac
         PRODUCT_NAME: Cadence
     info:
       path: Apps/Cadence-macOS/Info.plist
@@ -91,7 +91,7 @@ targets:
         NSHumanReadableCopyright: ""
         GoogleClientID: $(GOOGLE_MAC_CLIENT_ID)
         CFBundleURLTypes:
-          - CFBundleURLName: com.cadence.oauth
+          - CFBundleURLName: com.theocoronges.cadence.oauth
             CFBundleURLSchemes:
               - cadence
 
@@ -105,7 +105,7 @@ targets:
       - package: CadenceCore
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.cadence.coretests
+        PRODUCT_BUNDLE_IDENTIFIER: com.theocoronges.cadence.coretests
         GENERATE_INFOPLIST_FILE: YES
 
 schemes:

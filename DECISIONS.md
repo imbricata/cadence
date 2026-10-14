@@ -53,3 +53,4 @@ Every non-obvious choice made while building, one line each. Appended chronologi
 - JSON export reuses the sync snapshot structs (pretty-printed, ISO-8601 dates) and uses SwiftUI `.fileExporter`.
 - Bundle ids fixed as: iOS `com.cadence.ios`, macOS `com.cadence.mac`, widget `com.cadence.ios.widgets`.
 - Review fixes: the calendar list includes read-only calendars (so a subscribed college calendar shows up); creating an area auto-creates its Google calendar (also for existing areas on sign-in); rename/recolor pushes to Google.
+- Bundle IDs renamed to `com.theocoronges.cadence` / `.widgets` / `.mac` because `com.cadence.ios` was already registered by someone else on Apple's Personal Team registry (Xcode "cannot register ... not available").

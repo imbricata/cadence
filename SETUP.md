@@ -18,8 +18,8 @@ Do these steps by hand, in order. Anything you skip will show up as "not connect
    - App name "Cadence", your email as support email.
    - Add your own Google account as a **test user** while in "Testing" mode (you can switch to "In production" once it works).
 6. Create two OAuth clients (APIs & Services → Credentials → Create credentials → OAuth client ID), both of application type **iOS**:
-   - "Cadence iPhone" — Bundle ID `com.cadence.ios`
-   - "Cadence Mac" — Bundle ID `com.cadence.mac` (Google uses the iOS client type for native Mac apps too)
+   - "Cadence iPhone" — Bundle ID `com.theocoronges.cadence`
+   - "Cadence Mac" — Bundle ID `com.theocoronges.cadence.mac` (Google uses the iOS client type for native Mac apps too)
    - No redirect URI or secret to configure: iOS clients automatically allow `com.googleusercontent.apps.<id>:/oauth2redirect`, which Cadence uses with PKCE.
 7. Copy both **Client IDs**. On the consent screen (Audience), switch publishing status to **In production** — in Testing mode, Google expires refresh tokens after 7 days. The `calendar` scope is classed as sensitive, so on first sign-in Google shows "Google hasn't verified this app": tap **Advanced → Go to Cadence (unsafe)**. That's expected for a personal, unverified app; no review is needed.
 
@@ -43,7 +43,7 @@ Do these steps by hand, in order. Anything you skip will show up as "not connect
 12. For the **CadenceiOS** target: Signing & Capabilities → check "Automatically manage signing", select your **Personal Team**.
 13. Do the same for **CadenceWidgets** (the widget extension).
 14. For the **CadenceMac** target, select your Personal Team.
-15. Keep the bundle identifiers as-is (`com.cadence.ios`, `com.cadence.ios.widgets`, `com.cadence.mac`). They must match the Google OAuth clients, and a free Personal Team can only register a few App IDs per week, so don't change them. If Xcode says an ID is taken, change the prefix once everywhere (project.yml + both Google clients) and run `xcodegen generate` again.
+15. Keep the bundle identifiers as-is (`com.theocoronges.cadence`, `com.theocoronges.cadence.widgets`, `com.theocoronges.cadence.mac`). They must match the Google OAuth clients, and a free Personal Team can only register a few App IDs per week, so don't change them. If Xcode says an ID is taken, change the prefix once everywhere (project.yml + the Google clients) and run `xcodegen generate` again.
 
 ## 6. Run
 
