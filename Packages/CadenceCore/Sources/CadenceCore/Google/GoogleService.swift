@@ -35,6 +35,7 @@ public final class GoogleService {
         do { try await auth.authorize(); needsReconnect = false }
         catch { needsReconnect = true; return }
         for area in visibleAreas(in: store.context) { await ensureCalendar(for: area) }
+        await refreshWideWindow()
     }
 
     public func signOut() {
@@ -76,6 +77,14 @@ public final class GoogleService {
         } else {
             createArea(store, name: cal.summary ?? "Classes", colorHex: "#888C96", symbolName: "graduationcap", calendarId: cal.id, isClasses: true)
         }
+        Task { await refreshWideWindow() }
+    }
+
+    private func refreshWideWindow() async {
+        let cal = Calendar.current
+        let start = cal.date(byAdding: .day, value: -7, to: .now) ?? .now
+        let end = cal.date(byAdding: .day, value: 30, to: .now) ?? .now
+        await refreshEvents(start: start, end: end)
     }
 
     /// If the area has no calendar yet, create a Google calendar named after it and link it.
