@@ -149,10 +149,15 @@ public struct GoogleCalendarAPI: Sendable {
         guard let http = response as? HTTPURLResponse else { throw GoogleAPIError.decoding("no response") }
         guard (200..<300).contains(http.statusCode) else {
             if http.statusCode == 401 { throw GoogleAPIError.unauthorized }
-            let msg = String(data: data, encoding: .utf8) ?? "unknown"
+            let msg = Self.googleErrorMessage(data) ?? String(data: data, encoding: .utf8) ?? "unknown"
             throw GoogleAPIError.http(http.statusCode, msg)
         }
         return data
+    }
+
+    private static func googleErrorMessage(_ data: Data) -> String? {
+        struct Body: Decodable { struct Inner: Decodable { let message: String }; let error: Inner }
+        return (try? JSONDecoder().decode(Body.self, from: data))?.error.message
     }
 
     private func decode<T: Decodable>(_ type: T.Type, _ data: Data) throws -> T {
