@@ -14,6 +14,8 @@ public final class GoogleService {
     public var lastSyncAt: Date?
     public var needsReconnect: Bool = false
     public var isSyncing: Bool = false
+    public var lastEventError: String?
+    public var lastEventCount: Int = 0
 
     public private(set) var cachedEvents: [CalendarEvent] = []
 
@@ -126,9 +128,12 @@ public final class GoogleService {
                 }
             }
             cachedEvents = events
+            lastEventCount = events.count
+            lastEventError = nil
             saveCache()
             needsReconnect = false
         } catch {
+            lastEventError = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
             if let g = error as? GoogleAPIError, g.isAuthError { needsReconnect = true }
         }
     }

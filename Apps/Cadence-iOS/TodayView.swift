@@ -29,7 +29,13 @@ struct TodayView: View {
                 if !google.isAuthorized {
                     ConnectGooglePlaceholder()
                 } else if dayEvents.isEmpty {
-                    ContentUnavailableView("Nothing planned", systemImage: "calendar", description: Text("This day is clear."))
+                    ScrollView {
+                        ContentUnavailableView("Nothing planned", systemImage: "calendar", description: Text(emptyDetail))
+                            .padding(.top, 80)
+                        Button("Refresh") { Task { await google.refreshEvents(start: windowStart, end: windowEnd) } }
+                            .buttonStyle(.bordered)
+                            .padding(.top, 12)
+                    }
                 } else {
                     List {
                         if let ft = followThrough {
@@ -84,6 +90,16 @@ struct TodayView: View {
 
     private var title: String {
         Calendar.current.isDateInToday(date) ? "Today" : date.formatted(.dateTime.weekday(.wide).month().day())
+    }
+
+    private var emptyDetail: String {
+        if let err = google.lastEventError {
+            return "Couldn't load events: \(err)"
+        }
+        if google.lastEventCount > 0 {
+            return "Loaded \(google.lastEventCount) event(s), but none on this day."
+        }
+        return "This day is clear. Pull down or tap Refresh to reload."
     }
 
     private var windowStart: Date {

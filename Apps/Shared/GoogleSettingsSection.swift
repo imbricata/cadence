@@ -49,6 +49,11 @@ struct GoogleSettingsSection: View {
                 if let last = google.lastSyncAt {
                     LabeledContent("Last sync", value: last.formatted(.relative(presentation: .named)))
                 }
+                LabeledContent("Events loaded", value: "\(google.lastEventCount)")
+                    .monospacedDigit()
+                if let err = google.lastEventError {
+                    Text(err).font(.footnote).foregroundStyle(.red)
+                }
                 Button {
                     Task { await google.syncNow() }
                 } label: {
