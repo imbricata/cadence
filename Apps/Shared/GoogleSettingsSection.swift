@@ -7,6 +7,7 @@ struct GoogleSettingsSection: View {
     @Query(sort: \Area.sortOrder) private var areas: [Area]
     @State private var calendars: [GoogleCalendar] = []
     @State private var selectedCalendarId: String = ""
+    @State private var icsURL: String = ""
 
     private var classes: Area? { areas.first { !$0.isDeleted && $0.isClassesCalendar } }
 
@@ -43,6 +44,16 @@ struct GoogleSettingsSection: View {
                         }
                     }
                 }
+                TextField("Paste ICS link (e.g. Blackboard)", text: $icsURL)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .onAppear {
+                        if icsURL.isEmpty, let c = classes, c.googleCalendarId.hasPrefix("http") {
+                            icsURL = c.googleCalendarId
+                        }
+                    }
+                Button("Use ICS link") { google.linkClassesICS(icsURL) }
+                    .disabled(icsURL.trimmingCharacters(in: .whitespaces).isEmpty)
             }
 
             Section("Sync") {

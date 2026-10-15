@@ -55,3 +55,4 @@ Every non-obvious choice made while building, one line each. Appended chronologi
 - Review fixes: the calendar list includes read-only calendars (so a subscribed college calendar shows up); creating an area auto-creates its Google calendar (also for existing areas on sign-in); rename/recolor pushes to Google.
 - Bundle IDs renamed to `com.theocoronges.cadence` / `.widgets` / `.mac` because `com.cadence.ios` was already registered by someone else on Apple's Personal Team registry (Xcode "cannot register ... not available").
 - Widget removed at owner request (app-only install). App icons added: single-size 1024 for iOS, full multi-size set for macOS, generated from the Cadence mark (teal bars on light background, full-bleed opaque).
+- Classes can now be an ICS feed URL instead of a Google calendar: the app fetches + parses the raw `.ics` directly (auto-updating), because Google's Calendar API returns 400 for URL-subscribed calendars (e.g. Blackboard Learn feeds).

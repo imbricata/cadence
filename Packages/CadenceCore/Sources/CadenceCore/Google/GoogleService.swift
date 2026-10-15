@@ -8,6 +8,7 @@ public final class GoogleService {
     public let auth: GoogleAuth
     public let calendar: GoogleCalendarAPI
     public let syncEngine: SyncEngine
+    private let icsClient = ICSClient()
 
     private let store: AppStore
 
@@ -82,6 +83,18 @@ public final class GoogleService {
         Task { await refreshWideWindow() }
     }
 
+    /// Links the Classes area to a raw ICS feed URL (e.g. a Blackboard timetable link).
+    public func linkClassesICS(_ urlString: String) {
+        let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        if let existing = classesArea(in: store.context) {
+            updateArea(store, existing, name: "Classes", calendarId: trimmed)
+        } else {
+            createArea(store, name: "Classes", colorHex: "#888C96", symbolName: "graduationcap", calendarId: trimmed, isClasses: true)
+        }
+        Task { await refreshWideWindow() }
+    }
+
     private func refreshWideWindow() async {
         let cal = Calendar.current
         let start = cal.date(byAdding: .day, value: -7, to: .now) ?? .now
@@ -124,9 +137,14 @@ public final class GoogleService {
             let token = try await auth.accessToken()
             for area in active {
                 do {
-                    let list = try await calendar.listEvents(accessToken: token, calendarId: area.googleCalendarId, start: start, end: end)
-                    for e in list {
-                        if let norm = Self.normalize(e, calendarId: area.googleCalendarId) { events.append(norm) }
+                    if area.googleCalendarId.hasPrefix("http") {
+                        let feed = try await icsClient.fetchEvents(url: URL(string: area.googleCalendarId)!)
+                        events.append(contentsOf: feed)
+                    } else {
+                        let list = try await calendar.listEvents(accessToken: token, calendarId: area.googleCalendarId, start: start, end: end)
+                        for e in list {
+                            if let norm = Self.normalize(e, calendarId: area.googleCalendarId) { events.append(norm) }
+                        }
                     }
                 } catch {
                     errors.append("\(area.name): \((error as? LocalizedError)?.errorDescription ?? String(describing: error))")
