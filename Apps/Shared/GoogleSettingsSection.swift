@@ -46,7 +46,6 @@ struct GoogleSettingsSection: View {
                 }
                 TextField("Paste ICS link (e.g. Blackboard)", text: $icsURL)
                     .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
                     .onAppear {
                         if icsURL.isEmpty, let c = classes, c.googleCalendarId.hasPrefix("http") {
                             icsURL = c.googleCalendarId
@@ -84,11 +83,18 @@ struct GoogleSettingsSection: View {
 
 /// Calm empty-state prompt shown on the Today/Plan screen when Google isn't connected.
 struct ConnectGooglePlaceholder: View {
+    @Environment(GoogleService.self) private var google
+
     var body: some View {
         ContentUnavailableView {
             Label("Connect Google Calendar", systemImage: "calendar.badge.plus")
         } description: {
-            Text("Connect Google to link your college calendar and begin planning your days.")
+            Text("Connect Google to see your classes and plan your days.")
+        } actions: {
+            Button("Connect Google Calendar") {
+                Task { await google.signIn() }
+            }
+            .buttonStyle(.borderedProminent)
         }
     }
 }

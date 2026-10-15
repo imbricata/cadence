@@ -42,16 +42,19 @@ struct PlanView: View {
         }
         .navigationTitle(navTitle)
         .toolbar {
-            ToolbarItemGroup {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button { requestCreate(.now) } label: { Label("New Block", systemImage: "plus") }
+                    .help("Create a block (⇧⌘B)")
+                Button { Task { await syncAndRefresh() } } label: { Label("Sync", systemImage: "arrow.clockwise") }
+                    .help("Sync calendars and refresh (⌘S)")
+            }
+            ToolbarItemGroup(placement: .navigation) {
                 Button { shiftWeek(-1) } label: { Image(systemName: "chevron.left") }
-                Button("This week") { weekAnchor = .now }
+                    .help("Previous week (⌘←)")
+                Button("This Week") { weekAnchor = .now }
+                    .help("Jump to this week (⌘T)")
                 Button { shiftWeek(1) } label: { Image(systemName: "chevron.right") }
-                Button { Task { await syncAndRefresh() } } label: {
-                    Image(systemName: "arrow.clockwise")
-                }
-                Button { requestCreate(.now) } label: {
-                    Image(systemName: "plus")
-                }
+                    .help("Next week (⌘→)")
             }
         }
         .onAppear { Task { await syncAndRefresh() } }
