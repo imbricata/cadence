@@ -119,17 +119,23 @@ public final class GoogleService {
         guard isAuthorized else { return }
         let active = visibleAreas(in: store.context).filter { !$0.googleCalendarId.isEmpty }
         var events: [CalendarEvent] = []
+        var errors: [String] = []
         do {
             let token = try await auth.accessToken()
             for area in active {
-                let list = try await calendar.listEvents(accessToken: token, calendarId: area.googleCalendarId, start: start, end: end)
-                for e in list {
-                    if let norm = Self.normalize(e, calendarId: area.googleCalendarId) { events.append(norm) }
+                do {
+                    let list = try await calendar.listEvents(accessToken: token, calendarId: area.googleCalendarId, start: start, end: end)
+                    for e in list {
+                        if let norm = Self.normalize(e, calendarId: area.googleCalendarId) { events.append(norm) }
+                    }
+                } catch {
+                    errors.append("\(area.name): \((error as? LocalizedError)?.errorDescription ?? String(describing: error))")
+                    if let g = error as? GoogleAPIError, g.isAuthError { needsReconnect = true }
                 }
             }
             cachedEvents = events
             lastEventCount = events.count
-            lastEventError = nil
+            lastEventError = errors.isEmpty ? nil : errors.joined(separator: "\n")
             saveCache()
             needsReconnect = false
         } catch {
