@@ -4,145 +4,195 @@ import CadenceCore
 
 struct TodayView: View {
     @Environment(AppStore.self) private var store
-    @Environment(\.openSettings) private var openSettings
     @Environment(GoogleService.self) private var google
     @Environment(InsightsModel.self) private var insights
-    @Query(sort: \Area.sortOrder) private var areas: [Area]
-    @State private var date = Date()
-    @State private var blockTarget: BlockSheetTarget?
-    @State private var showNewBlock = false
-    @State private var showUnplanned = false
+    @Environment(\.openSettings) private var openSettings
 
-    private var dayEvents: [CalendarEvent] {
-        google.events(on: date).sorted { $0.start < $1.start }
+    @Query(sort: \Area.sortOrder) private var areas: [Area]
+    @Query private var logs: [BlockLog]
+    @Query private var entries: [BlockEntry]
+    @Query private var items: [Item]
+
+    @State private var date = Date()
+    @State private var forward = true
+    @State private var blockTarget: BlockSheetTarget?
+    @State private var readOnly: CalendarEvent?
+    @State private var createSlot: CreateSlot?
+    @State private var showUnplanned = false
+    @State private var deleteCandidate: CalendarEvent?
+
+    private var cal: Calendar { .current }
+    private var isToday: Bool { cal.isDateInToday(date) }
+    private var dayEvents: [CalendarEvent] { google.events(on: date) }
+
+    private var title: String {
+        isToday ? "Today" : date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))
     }
 
-    private var followThrough: Double? { insights.snapshot.followThrough.percent }
+    /// Days of the visible week that have Area blocks, for the dots under the week strip.
+    private var busyDays: Set<Date> {
+        let areaCals = Set(areas.filter { !$0.isClassesCalendar && !$0.googleCalendarId.isEmpty }.map(\.googleCalendarId))
+        guard let week = cal.dateInterval(of: .weekOfYear, for: date) else { return [] }
+        return Set(google.eventStore.events(overlapping: week).filter { areaCals.contains($0.calendarId) && !$0.isAllDayLike }.map { cal.startOfDay(for: $0.start) })
+    }
 
     var body: some View {
         NavigationStack {
-            Group {
-                if !google.isAuthorized {
+            VStack(spacing: 0) {
+                header
+                if !google.isAuthorized && google.cachedEvents.isEmpty {
                     ConnectGooglePlaceholder()
-                } else if dayEvents.isEmpty {
-                    ScrollView {
-                        ContentUnavailableView("Nothing planned", systemImage: "calendar", description: Text(emptyDetail))
-                            .padding(.top, 80)
-                        Button("Refresh") { Task { await google.refreshVisible() } }
-                            .buttonStyle(.bordered)
-                            .padding(.top, 12)
-                    }
                 } else {
-                    List {
-                        if let ft = followThrough {
-                            Section {
-                                HStack {
-                                    Text("Follow-through · 7 days").font(.footnote).foregroundStyle(.secondary)
-                                    Spacer()
-                                    Text("\(Int(ft.rounded()))%").font(.footnote).monospacedDigit().foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                        ForEach(dayEvents) { event in
-                            EventRow(event: event, area: area(for: event))
-                                .contentShape(Rectangle())
-                                .onTapGesture { open(event) }
-                        }
-                    }
-                    .listStyle(.plain)
+                    DayTimeline(
+                        day: date, events: dayEvents, areas: areas,
+                        info: BlockInfoIndex(logs: logs, entries: entries, items: items),
+                        actions: actions
+                    )
+                    .id(cal.startOfDay(for: date))
+                    .transition(.asymmetric(
+                        insertion: .move(edge: forward ? .trailing : .leading).combined(with: .opacity),
+                        removal: .move(edge: forward ? .leading : .trailing).combined(with: .opacity)
+                    ))
+                    .refreshable { await google.refreshVisible() }
+                    .simultaneousGesture(daySwipe)
+                    .clipped()
                 }
             }
             .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
             .statusBanner()
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) { dayArrow("chevron.left", -1) }
-                ToolbarItem(placement: .topBarLeading) { Button("Today") { date = .now } }
-                ToolbarItem(placement: .topBarLeading) { dayArrow("chevron.right", 1) }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button { showNewBlock = true } label: { Label("New block", systemImage: "plus") }
-                        Button { showUnplanned = true } label: { Label("Log time", systemImage: "clock.badge.plus") }
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .topBarLeading) {
                     Button { openSettings() } label: { Image(systemName: "gearshape") }
                         .accessibilityLabel("Settings")
                 }
-            }
-            .refreshable { await google.refreshVisible() }
-            .task(id: Calendar.current.startOfDay(for: date)) {
-                if let day = Calendar.current.dateInterval(of: .day, for: date) { await google.ensureEvents(in: day) }
-            }
-        }
-        .sheet(item: $blockTarget) { target in
-            BlockDetailView(event: target.event, area: target.area)
-        }
-        .sheet(isPresented: $showNewBlock) {
-            NewBlockSheet(initialDate: date, initialStart: date)
-        }
-        .sheet(isPresented: $showUnplanned) {
-            UnplannedLogSheet()
-        }
-    }
-
-    private var title: String {
-        Calendar.current.isDateInToday(date) ? "Today" : date.formatted(.dateTime.weekday(.wide).month().day())
-    }
-
-    private var emptyDetail: String {
-        "Nothing planned for this day."
-    }
-
-    private func dayArrow(_ symbol: String, _ delta: Int) -> some View {
-        Button { date = Calendar.current.date(byAdding: .day, value: delta, to: date) ?? date }
-        label: { Image(systemName: symbol) }
-    }
-
-    private func area(for event: CalendarEvent) -> Area? {
-        areas.first { !$0.isDeleted && $0.googleCalendarId == event.calendarId }
-    }
-
-    private func open(_ event: CalendarEvent) {
-        guard let area = area(for: event), !area.isClassesCalendar else { return }
-        blockTarget = BlockSheetTarget(id: event.id, event: event, area: area)
-    }
-}
-
-struct EventRow: View {
-    let event: CalendarEvent
-    let area: Area?
-
-    var body: some View {
-        HStack(spacing: 12) {
-            VStack(spacing: 2) {
-                Text(event.start, format: .dateTime.hour().minute())
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-                Rectangle()
-                    .fill(isClasses ? Color.secondary.opacity(0.3) : Color(hex: area?.colorHex ?? "#888C96"))
-                    .frame(width: 2)
-                    .frame(maxHeight: .infinity)
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(event.summary)
-                    .foregroundStyle(isClasses ? Color.secondary : .primary)
-                if !isClasses {
-                    Text(area?.name ?? "")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                if !isToday {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Today") { go(to: .now) }
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button { newBlockAtNextFreeSlot() } label: { Label("New Block", systemImage: "plus") }
+                        Button { showUnplanned = true } label: { Label("Log Time", systemImage: "clock.badge.plus") }
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .accessibilityLabel("Add")
                 }
             }
-            Spacer()
-            Text(event.end, format: .dateTime.hour().minute())
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
+            .task(id: cal.startOfDay(for: date)) {
+                if let week = cal.dateInterval(of: .weekOfYear, for: date) { await google.ensureEvents(in: week) }
+            }
+            #if DEBUG
+            .task { await debugOpen() }
+            #endif
         }
-        .padding(.vertical, 4)
+        .sheet(item: $blockTarget) { t in
+            BlockDetailView(event: t.event, area: t.area)
+                .presentationDetents([.medium, .large])
+        }
+        .sheet(item: $readOnly) { e in
+            ReadOnlyEventView(event: e)
+                .presentationDetents([.height(180)])
+        }
+        .sheet(item: $createSlot) { QuickCreateSheet(slot: $0) }
+        .sheet(isPresented: $showUnplanned) { UnplannedLogSheet() }
+        .confirmationDialog(
+            "Delete this block?",
+            isPresented: Binding(get: { deleteCandidate != nil }, set: { if !$0 { deleteCandidate = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button("Delete Block", role: .destructive) {
+                if let e = deleteCandidate { Task { await google.deleteBlock(event: e) } }
+                deleteCandidate = nil
+            }
+        } message: { Text("It has been logged. The log stays in your history.") }
     }
 
-    private var isClasses: Bool { area?.isClassesCalendar == true }
+    // MARK: Header
+
+    private var header: some View {
+        VStack(spacing: Theme.Space.s) {
+            WeekStrip(selection: Binding(get: { date }, set: { go(to: $0) }), busyDays: busyDays)
+            HStack {
+                Text(date, format: .dateTime.weekday(.wide).day().month(.wide))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer()
+                if let p = insights.snapshot.followThrough.percent {
+                    Text("Follow-through \(Int(p.rounded()))%")
+                        .font(.footnote)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+            }
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+            .padding(.horizontal, Theme.Space.l)
+        }
+        .padding(.bottom, Theme.Space.s)
+        .overlay(alignment: .bottom) { Divider() }
+    }
+
+    // MARK: Actions
+
+    private var actions: TimelineActions {
+        TimelineActions(
+            open: { e, a in blockTarget = BlockSheetTarget(id: e.id, event: e, area: a) },
+            openReadOnly: { readOnly = $0 },
+            create: { m in createSlot = CreateSlot(day: date, startMinute: m) },
+            log: { e, a, state in
+                logBlock(store, BlockRef(event: e, areaId: a.id), state: state)
+            },
+            changeArea: { e, old, new in Task { await google.changeBlockArea(event: e, from: old, to: new) } },
+            delete: { e in
+                if let s = BlockInfoIndex(logs: logs, entries: entries, items: items).info(for: e)?.state, s != .unlogged {
+                    deleteCandidate = e
+                } else {
+                    Task { await google.deleteBlock(event: e) }
+                }
+            }
+        )
+    }
+
+    private var daySwipe: some Gesture {
+        DragGesture(minimumDistance: 30)
+            .onEnded { v in
+                guard abs(v.translation.width) > 80, abs(v.translation.width) > abs(v.translation.height) * 2 else { return }
+                go(to: cal.date(byAdding: .day, value: v.translation.width < 0 ? 1 : -1, to: date) ?? date)
+            }
+    }
+
+    private func go(to newDate: Date) {
+        guard !cal.isDate(newDate, inSameDayAs: date) else { return }
+        forward = newDate > date
+        withAnimation(Theme.snappy) { date = newDate }
+    }
+
+    private func newBlockAtNextFreeSlot() {
+        let from = isToday ? EventLayout.minuteOfDay(.now, on: date) : 9 * 60
+        let m = EventLayout.nextFreeSlot(on: date, from: from, duration: 60, events: dayEvents)
+        createSlot = CreateSlot(day: date, startMinute: min(m, 1380))
+    }
+
+    #if DEBUG
+    /// `-CadenceSheet block|create|log` for screenshots.
+    private func debugOpen() async {
+        guard let what = DemoMode.arg("CadenceSheet"), what != "settings" else { return }
+        try? await Task.sleep(for: .seconds(2))
+        switch what {
+        case "create": createSlot = CreateSlot(day: date, startMinute: 10 * 60)
+        case "log": showUnplanned = true
+        default:
+            if let e = dayEvents.first(where: { ev in areas.first { $0.googleCalendarId == ev.calendarId }?.isClassesCalendar == false }),
+               let a = areas.first(where: { $0.googleCalendarId == e.calendarId }) {
+                blockTarget = BlockSheetTarget(id: e.id, event: e, area: a)
+            }
+        }
+    }
+    #endif
 }

@@ -207,7 +207,7 @@ struct CalendarCanvas: View {
             if let area, !area.isClassesCalendar {
                 BlockDetailView(event: p.event, area: area, presentation: .popover)
             } else {
-                ReadOnlyEventPopover(event: p.event)
+                ReadOnlyEventView(event: p.event)
             }
         }
         .contextMenu { if let area, editable { blockMenu(p.event, area) } }
