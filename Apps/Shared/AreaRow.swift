@@ -8,16 +8,6 @@ public let symbolChoices: [String] = [
     "gift", "waveform", "camera", "gamecontroller", "stethoscope", "airplane"
 ]
 
-struct AreaColorDot: View {
-    let colorHex: String
-    var size: CGFloat = 10
-    var body: some View {
-        Circle()
-            .fill(Color(hex: colorHex))
-            .frame(width: size, height: size)
-    }
-}
-
 struct AreaRow: View {
     let area: Area
     var formPercent: Double? = nil
@@ -25,7 +15,7 @@ struct AreaRow: View {
         HStack(spacing: 10) {
             Image(systemName: area.symbolName)
                 .frame(width: 26)
-                .foregroundStyle(Color(hex: area.colorHex))
+                .foregroundStyle(area.color.base)
             Text(area.name)
                 .frame(maxWidth: .infinity, alignment: .leading)
             FormLabel(percent: formPercent)

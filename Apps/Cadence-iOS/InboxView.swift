@@ -4,6 +4,7 @@ import CadenceCore
 
 struct InboxView: View {
     @Environment(AppStore.self) private var store
+    @Environment(\.openSettings) private var openSettings
     @Environment(InboxService.self) private var inbox
     @Query(sort: \InboxNote.createdAt, order: .reverse) private var notes: [InboxNote]
     @Query private var items: [Item]
@@ -37,11 +38,15 @@ struct InboxView: View {
                 }
             }
             .navigationTitle("Inbox")
+            .statusBanner()
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { openSettings() } label: { Image(systemName: "gearshape") }
+                        .accessibilityLabel("Settings")
+                }
+            }
             .safeAreaInset(edge: .bottom) { composer }
             .onAppear { Task { await inbox.processPending() } }
-            .onReceive(NotificationCenter.default.publisher(for: .openCapture)) { _ in
-                focused = true
-            }
         }
     }
 

@@ -223,7 +223,7 @@ final class AuthPresentationContext: NSObject, ASWebAuthenticationPresentationCo
         if let win = scenes.flatMap(\.windows).first(where: { $0.isKeyWindow }) { return win }
         if let win = scenes.first?.windows.first { return win }
         if let scene = scenes.first { return UIWindow(windowScene: scene) }
-        return ASPresentationAnchor()
+        preconditionFailure("Sign-in needs a visible window")
         #elseif os(macOS)
         return NSApp.keyWindow ?? NSApp.windows.first ?? NSWindow()
         #endif

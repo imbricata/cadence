@@ -4,6 +4,7 @@ import CadenceCore
 
 struct TodayView: View {
     @Environment(AppStore.self) private var store
+    @Environment(\.openSettings) private var openSettings
     @Environment(GoogleService.self) private var google
     @Environment(InsightsModel.self) private var insights
     @Query(sort: \Area.sortOrder) private var areas: [Area]
@@ -52,6 +53,7 @@ struct TodayView: View {
                 }
             }
             .navigationTitle(title)
+            .statusBanner()
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) { dayArrow("chevron.left", -1) }
                 ToolbarItem(placement: .topBarLeading) { Button("Today") { date = .now } }
@@ -65,7 +67,8 @@ struct TodayView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink { SettingsView() } label: { Image(systemName: "gearshape") }
+                    Button { openSettings() } label: { Image(systemName: "gearshape") }
+                        .accessibilityLabel("Settings")
                 }
             }
             .refreshable { await google.refreshVisible() }

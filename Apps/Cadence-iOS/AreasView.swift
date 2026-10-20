@@ -4,6 +4,7 @@ import CadenceCore
 
 struct AreasView: View {
     @Environment(AppStore.self) private var store
+    @Environment(\.openSettings) private var openSettings
     @Environment(InsightsModel.self) private var insights
     @Query(sort: \Area.sortOrder) private var areas: [Area]
     @State private var showingNew = false
@@ -29,7 +30,12 @@ struct AreasView: View {
                 }
             }
             .navigationTitle("Areas")
+            .statusBanner()
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { openSettings() } label: { Image(systemName: "gearshape") }
+                        .accessibilityLabel("Settings")
+                }
                 ToolbarItem(placement: .topBarTrailing) { EditButton() }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showingNew = true } label: { Image(systemName: "plus") }

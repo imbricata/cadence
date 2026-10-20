@@ -2,15 +2,24 @@ import SwiftUI
 import CadenceCore
 
 struct SettingsView: View {
+    @Environment(\.dismiss) private var dismiss
+
     var body: some View {
-        Form {
-            GoogleSettingsSection()
-            InboxSettingsSection()
-            ExportSection()
-            Section("About") {
-                LabeledContent("Version", value: "0.1.0")
+        NavigationStack {
+            Form {
+                AccountSection()
+                ClassesSection()
+                SyncSection()
+                AISortingSection()
+                ExportSection()
+                AdvancedSection()
+                AboutSection()
+            }
+            .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
         }
-        .navigationTitle("Settings")
     }
 }

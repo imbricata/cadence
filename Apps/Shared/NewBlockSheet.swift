@@ -31,7 +31,7 @@ struct NewBlockSheet: View {
                         Text("Choose…").tag(UUID?.none)
                         ForEach(selectableAreas) { area in
                             HStack {
-                                AreaColorDot(colorHex: area.colorHex)
+                                AreaDot(colorHex: area.colorHex)
                                 Text(area.name)
                             }
                             .tag(Optional(area.id))

@@ -51,7 +51,7 @@ struct AreaBacklogSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                AreaColorDot(colorHex: area.colorHex)
+                AreaDot(colorHex: area.colorHex)
                 Text(area.name).font(.headline)
                 Spacer()
             }

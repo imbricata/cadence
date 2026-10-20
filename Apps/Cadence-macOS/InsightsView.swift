@@ -79,7 +79,7 @@ struct InsightsView: View {
                 let areaId = items.first { $0.id == stat.itemId }?.areaId
                 HStack {
                     if let area = areas.first(where: { $0.id == areaId }) {
-                        AreaColorDot(colorHex: area.colorHex)
+                        AreaDot(colorHex: area.colorHex)
                     }
                     VStack(alignment: .leading) {
                         Text(title)

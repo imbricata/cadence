@@ -26,18 +26,18 @@ struct JSONExportDocument: FileDocument {
 struct ExportSection: View {
     @Environment(AppStore.self) private var store
     @State private var exporting = false
-
-    private var json: String {
-        String(decoding: exportJSON(context: store.context), as: UTF8.self)
-    }
+    @State private var document = JSONExportDocument(text: "")
 
     var body: some View {
         Section("Data") {
-            Button("Export JSON") { exporting = true }
+            Button("Export JSON…") {
+                document = JSONExportDocument(text: String(decoding: exportJSON(context: store.context), as: UTF8.self))
+                exporting = true
+            }
         }
         .fileExporter(
             isPresented: $exporting,
-            document: JSONExportDocument(text: json),
+            document: document,
             contentType: .json,
             defaultFilename: "cadence-export"
         ) { _ in }

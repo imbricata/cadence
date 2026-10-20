@@ -42,7 +42,7 @@ struct InboxNoteRow: View {
         case .sorted:
             Button { showEditor = true } label: {
                 HStack(spacing: 10) {
-                    AreaColorDot(colorHex: area?.colorHex ?? "#888C96", size: 10)
+                    AreaDot(colorHex: area?.colorHex ?? "#888C96", size: 10)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(item?.title ?? "")
                             .font(.subheadline)
@@ -120,39 +120,5 @@ struct ManualSortSheet: View {
         let item = createItem(store, kind: kind, title: title.trimmingCharacters(in: .whitespaces), areaId: areaId)
         completeManually(store, note, itemId: item.id)
         dismiss()
-    }
-}
-
-struct InboxSettingsSection: View {
-    @Environment(InboxService.self) private var inbox
-
-    @State private var key: String = ""
-    @State private var model: String = ""
-    @State private var cap: Double = 1.0
-
-    var body: some View {
-        Section("OpenRouter (AI sorting)") {
-            SecureField("API key", text: $key)
-                .onAppear { key = inbox.currentKey }
-                .onSubmit { inbox.setKey(key) }
-
-            TextField("Model", text: $model)
-                .onAppear { model = inbox.model }
-                .onSubmit { inbox.setModel(model) }
-
-            Stepper(value: $cap, in: 0.25...20, step: 0.25) {
-                Text("Monthly cap: $\(String(format: "%.2f", cap))")
-            }
-            .onChange(of: cap) { _, v in inbox.setCap(v) }
-            .onAppear { cap = inbox.monthlyCapUSD }
-
-            LabeledContent("This month", value: "$\(String(format: "%.3f", inbox.monthCostUSD))")
-                .monospacedDigit()
-            if inbox.isOverCap {
-                Label("Monthly cap reached — sorting paused", systemImage: "pause.circle")
-                    .font(.footnote)
-                    .foregroundStyle(.orange)
-            }
-        }
     }
 }

@@ -12,14 +12,14 @@ struct PlanView: View {
     @State private var showNewBlock = false
     @State private var newBlockStart = Date()
     @State private var blockTarget: BlockSheetTarget?
+    @State private var showBacklog = true
 
     var body: some View {
         Group {
             if !google.isAuthorized {
                 ConnectGooglePlaceholder()
             } else {
-                HStack(spacing: 0) {
-                    WeekGrid(
+                WeekGrid(
                         week: weekAnchor,
                         events: google.cachedEvents,
                         areaFor: areaFor,
@@ -33,11 +33,7 @@ struct PlanView: View {
                             Task { await google.updateBlock(event: event, start: nil, end: newEnd, summary: nil) }
                         },
                         onDropItem: dropItem
-                    )
-                    Divider()
-                    BacklogView()
-                        .frame(width: 300)
-                }
+                )
             }
         }
         .navigationTitle(navTitle)
@@ -58,11 +54,18 @@ struct PlanView: View {
             }
         }
         .task(id: weekStartDate) { await ensureWeekLoaded() }
-        .onReceive(NotificationCenter.default.publisher(for: .commandNewBlock)) { _ in requestCreate(.now) }
-        .onReceive(NotificationCenter.default.publisher(for: .commandPrevDay)) { _ in shiftWeek(-1) }
-        .onReceive(NotificationCenter.default.publisher(for: .commandNextDay)) { _ in shiftWeek(1) }
-        .onReceive(NotificationCenter.default.publisher(for: .commandToday)) { _ in weekAnchor = .now }
-        .onReceive(NotificationCenter.default.publisher(for: .commandSync)) { _ in Task { await google.syncNow(); await google.refreshVisible() } }
+        .inspector(isPresented: $showBacklog) {
+            BacklogView().inspectorColumnWidth(min: 240, ideal: 300, max: 420)
+        }
+        .focusedSceneValue(\.planActions, PlanActions(
+            newBlock: { requestCreate(.now) },
+            previous: { shiftWeek(-1) },
+            next: { shiftWeek(1) },
+            today: { weekAnchor = .now },
+            refresh: { Task { await google.syncNow(); await google.refreshVisible() } },
+            toggleBacklog: { showBacklog.toggle() },
+            setMode: { _ in }
+        ))
         .sheet(isPresented: $showNewBlock) {
             NewBlockSheet(initialDate: newBlockStart, initialStart: newBlockStart)
         }
