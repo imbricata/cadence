@@ -8,8 +8,11 @@ struct BlockDetailView: View {
     @Environment(AppStore.self) private var store
     @Environment(\.dismiss) private var dismiss
 
+    enum Presentation { case sheet, popover }
+
     let event: CalendarEvent
     let area: Area
+    var presentation: Presentation = .sheet
 
     @Query private var items: [Item]
     @Query private var logs: [BlockLog]
@@ -51,8 +54,38 @@ struct BlockDetailView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
+        switch presentation {
+        case .sheet:
+            NavigationStack {
+                form
+                    .navigationTitle(event.summary.isEmpty ? area.name : event.summary)
+                    #if os(iOS)
+                    .navigationBarTitleDisplayMode(.inline)
+                    #endif
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) { Button("Done") { commitNote(); dismiss() } }
+                    }
+            }
+        case .popover:
+            VStack(spacing: 0) {
+                HStack(spacing: Theme.Space.s) {
+                    AreaDot(colorHex: area.colorHex)
+                    Text(event.summary.isEmpty ? area.name : event.summary).font(.headline).lineLimit(1)
+                    Spacer()
+                    Button("Done") { commitNote(); dismiss() }
+                        .keyboardShortcut(.defaultAction)
+                }
+                .padding(Theme.Space.l)
+                Divider()
+                form
+            }
+            .frame(width: 380)
+            .frame(minHeight: 320, maxHeight: 560)
+        }
+    }
+
+    private var form: some View {
+        Form {
                 Section {
                     LabeledContent("When") {
                         Text("\(event.start.formatted(.dateTime.weekday(.abbreviated).day().month())) · \(event.start.formatted(date: .omitted, time: .shortened))–\(event.end.formatted(date: .omitted, time: .shortened))")
@@ -105,21 +138,13 @@ struct BlockDetailView: View {
                     }
                 }
             }
-            .formStyle(.grouped)
-            .navigationTitle(event.summary.isEmpty ? area.name : event.summary)
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("Done") { commitNote(); dismiss() } }
-            }
-            .onAppear {
-                guard !noteLoaded else { return }
-                noteLoaded = true
-                note = log?.note ?? ""
-            }
-            .onDisappear(perform: commitNote)
+        .formStyle(.grouped)
+        .onAppear {
+            guard !noteLoaded else { return }
+            noteLoaded = true
+            note = log?.note ?? ""
         }
+        .onDisappear(perform: commitNote)
     }
 
     // MARK: - Rows

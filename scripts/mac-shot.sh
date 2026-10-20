@@ -5,13 +5,21 @@ set -e
 cd "$(dirname "$0")/.."
 APP=/tmp/cadence-dd/Build/Products/Debug/Cadence.app
 mkdir -p /tmp/shots
-[ -x /tmp/windowid ] || swiftc scripts/windowid.swift -o /tmp/windowid
+swiftc scripts/windowid.swift -o /tmp/windowid 2>/dev/null
 pkill -x Cadence 2>/dev/null || true
 sleep 0.5
 open -n "$APP" --args -CadenceDemo YES "${@:2}"
 sleep ${SHOT_DELAY:-4}
 WID=$(/tmp/windowid Cadence)
 [ -n "$WID" ] || { echo "no window found"; pkill -x Cadence; exit 1; }
-screencapture -o -x -l "$WID" "/tmp/shots/mac-$1.png"
+if [ -n "$SHOT_POPOVER" ]; then
+  # Popovers are separate windows: capture each Cadence window on its own (never a screen region).
+  n=0
+  for id in $(/tmp/windowid Cadence --all); do
+    n=$((n+1)); screencapture -o -x -l "$id" "/tmp/shots/mac-$1-$n.png" 2>/dev/null || true
+  done
+else
+  screencapture -o -x -l "$WID" "/tmp/shots/mac-$1.png"
+fi
 [ -n "$SHOT_KEEP" ] || pkill -x Cadence
 echo "/tmp/shots/mac-$1.png"

@@ -145,6 +145,13 @@ enum Format {
         return m == 0 ? "\(h) h" : "\(h) h \(m) min"
     }
 
+    /// "63 h", "1.5 h", "45 min".
+    static func hours(minutes: Int) -> String {
+        if minutes < 60 { return "\(minutes) min" }
+        let h = Double(minutes) / 60
+        return h >= 10 ? "\(Int(h.rounded())) h" : String(format: "%.1f h", h)
+    }
+
     static func timeRange(_ start: Date, _ end: Date) -> String {
         "\(start.formatted(date: .omitted, time: .shortened))–\(end.formatted(date: .omitted, time: .shortened))"
     }

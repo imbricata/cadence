@@ -10,9 +10,9 @@ struct CadenceApp: App {
         WindowGroup {
             RootView()
                 .cadenceEnvironment(services)
-                .frame(minWidth: 900, minHeight: 560)
+                .frame(minWidth: 980, minHeight: 600)
         }
-        .defaultSize(width: 1150, height: 720)
+        .defaultSize(width: 1320, height: 840)
 
         Settings {
             SettingsView()
