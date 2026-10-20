@@ -19,6 +19,11 @@ public enum CadenceSchema {
 @Observable
 public final class AppStore {
     public let container: ModelContainer
+    /// Bumped on every save, so observers (insights, sync scheduling) can react.
+    public private(set) var revision = 0
+    public private(set) var lastSaveError: String?
+    /// Called after each successful save.
+    @ObservationIgnored public var onChange: (@MainActor () -> Void)?
 
     public init(container: ModelContainer) {
         self.container = container
@@ -35,6 +40,8 @@ public final class AppStore {
     }
 
     public func save() {
-        do { try context.save() } catch { print("save error: \(error)") }
+        do { try context.save(); lastSaveError = nil } catch { lastSaveError = String(describing: error) }
+        revision &+= 1
+        onChange?()
     }
 }

@@ -5,10 +5,8 @@ import CadenceCore
 struct TodayView: View {
     @Environment(AppStore.self) private var store
     @Environment(GoogleService.self) private var google
+    @Environment(InsightsModel.self) private var insights
     @Query(sort: \Area.sortOrder) private var areas: [Area]
-    @Query private var items: [Item]
-    @Query private var blockLogs: [BlockLog]
-    @Query private var entries: [BlockEntry]
     @State private var date = Date()
     @State private var blockTarget: BlockSheetTarget?
     @State private var showNewBlock = false
@@ -18,10 +16,7 @@ struct TodayView: View {
         google.events(on: date).sorted { $0.start < $1.start }
     }
 
-    private var followThrough: Double? {
-        _ = (areas, items, blockLogs, entries)
-        return computeInsights(context: store.context, events: google.cachedEvents).followThrough.percent
-    }
+    private var followThrough: Double? { insights.snapshot.followThrough.percent }
 
     var body: some View {
         NavigationStack {
@@ -32,7 +27,7 @@ struct TodayView: View {
                     ScrollView {
                         ContentUnavailableView("Nothing planned", systemImage: "calendar", description: Text(emptyDetail))
                             .padding(.top, 80)
-                        Button("Refresh") { Task { await google.refreshEvents(start: windowStart, end: windowEnd) } }
+                        Button("Refresh") { Task { await google.refreshVisible() } }
                             .buttonStyle(.bordered)
                             .padding(.top, 12)
                     }
@@ -73,8 +68,9 @@ struct TodayView: View {
                     NavigationLink { SettingsView() } label: { Image(systemName: "gearshape") }
                 }
             }
-            .refreshable {
-                await google.refreshEvents(start: windowStart, end: windowEnd)
+            .refreshable { await google.refreshVisible() }
+            .task(id: Calendar.current.startOfDay(for: date)) {
+                if let day = Calendar.current.dateInterval(of: .day, for: date) { await google.ensureEvents(in: day) }
             }
         }
         .sheet(item: $blockTarget) { target in
@@ -93,20 +89,7 @@ struct TodayView: View {
     }
 
     private var emptyDetail: String {
-        if let err = google.lastEventError {
-            return "Couldn't load events: \(err)"
-        }
-        if google.lastEventCount > 0 {
-            return "Loaded \(google.lastEventCount) event(s), but none on this day."
-        }
-        return "This day is clear. Pull down or tap Refresh to reload."
-    }
-
-    private var windowStart: Date {
-        Calendar.current.date(byAdding: .day, value: -7, to: date) ?? date
-    }
-    private var windowEnd: Date {
-        Calendar.current.date(byAdding: .day, value: 8, to: date) ?? date
+        "Nothing planned for this day."
     }
 
     private func dayArrow(_ symbol: String, _ delta: Int) -> some View {

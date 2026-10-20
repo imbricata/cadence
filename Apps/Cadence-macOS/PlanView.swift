@@ -45,7 +45,7 @@ struct PlanView: View {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button { requestCreate(.now) } label: { Label("New Block", systemImage: "plus") }
                     .help("Create a block (⇧⌘B)")
-                Button { Task { await syncAndRefresh() } } label: { Label("Sync", systemImage: "arrow.clockwise") }
+                Button { Task { await google.syncNow(); await google.refreshVisible() } } label: { Label("Sync", systemImage: "arrow.clockwise") }
                     .help("Sync calendars and refresh (⌘S)")
             }
             ToolbarItemGroup(placement: .navigation) {
@@ -57,12 +57,12 @@ struct PlanView: View {
                     .help("Next week (⌘→)")
             }
         }
-        .onAppear { Task { await syncAndRefresh() } }
+        .task(id: weekStartDate) { await ensureWeekLoaded() }
         .onReceive(NotificationCenter.default.publisher(for: .commandNewBlock)) { _ in requestCreate(.now) }
         .onReceive(NotificationCenter.default.publisher(for: .commandPrevDay)) { _ in shiftWeek(-1) }
         .onReceive(NotificationCenter.default.publisher(for: .commandNextDay)) { _ in shiftWeek(1) }
         .onReceive(NotificationCenter.default.publisher(for: .commandToday)) { _ in weekAnchor = .now }
-        .onReceive(NotificationCenter.default.publisher(for: .commandSync)) { _ in Task { await syncAndRefresh() } }
+        .onReceive(NotificationCenter.default.publisher(for: .commandSync)) { _ in Task { await google.syncNow(); await google.refreshVisible() } }
         .sheet(isPresented: $showNewBlock) {
             NewBlockSheet(initialDate: newBlockStart, initialStart: newBlockStart)
         }
@@ -102,9 +102,14 @@ struct PlanView: View {
         addItemToBlock(store, item: item, googleEventId: event.id, eventStart: event.start, areaId: area.id, plannedMinutes: planned)
     }
 
-    private func syncAndRefresh() async {
+    private var weekStartDate: Date {
         let cal = Calendar.current
-        let start = cal.date(from: cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: weekAnchor))!
-        await google.refreshEvents(start: cal.date(byAdding: .day, value: -7, to: start)!, end: cal.date(byAdding: .day, value: 14, to: start)!)
+        return cal.date(from: cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: weekAnchor))!
+    }
+
+    private func ensureWeekLoaded() async {
+        let start = weekStartDate
+        let end = Calendar.current.date(byAdding: .day, value: 7, to: start)!
+        await google.ensureEvents(in: DateInterval(start: start, end: end))
     }
 }

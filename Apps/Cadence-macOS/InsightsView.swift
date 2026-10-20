@@ -3,19 +3,11 @@ import SwiftData
 import CadenceCore
 
 struct InsightsView: View {
-    @Environment(AppStore.self) private var store
-    @Environment(GoogleService.self) private var google
+    @Environment(InsightsModel.self) private var insights
     @Query(sort: \Area.sortOrder) private var areas: [Area]
     @Query private var items: [Item]
-    @Query private var blockLogs: [BlockLog]
-    @Query private var entries: [BlockEntry]
-    @Query private var unplanned: [UnplannedLog]
-    @Query private var targets: [Target]
 
-    private var snapshot: InsightSnapshot {
-        _ = (areas, items, blockLogs, entries, unplanned, targets)
-        return computeInsights(context: store.context, events: google.cachedEvents)
-    }
+    private var snapshot: InsightSnapshot { insights.snapshot }
 
     var body: some View {
         ScrollView {

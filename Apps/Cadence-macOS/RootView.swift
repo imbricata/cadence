@@ -43,19 +43,12 @@ struct RootView: View {
             case .none: Text("Select a section")
             }
         }
-        .onChange(of: scenePhase) { _, newPhase in
-            if newPhase == .active {
-                Task { await refresh() }
-            }
+        .onChange(of: scenePhase, initial: true) { _, newPhase in
+            google.setActive(newPhase == .active)
         }
         .onReceive(NotificationCenter.default.publisher(for: .commandNewNote)) { _ in
             selection = .inbox
         }
     }
 
-    private func refresh() async {
-        await google.syncNow()
-        let day = Calendar.current.dateInterval(of: .day, for: .now)!
-        await google.refreshEvents(start: day.start, end: day.end.addingTimeInterval(28 * 24 * 3600))
-    }
 }

@@ -4,20 +4,12 @@ import CadenceCore
 
 struct AreasView: View {
     @Environment(AppStore.self) private var store
-    @Environment(GoogleService.self) private var google
+    @Environment(InsightsModel.self) private var insights
     @Query(sort: \Area.sortOrder) private var areas: [Area]
-    @Query private var items: [Item]
-    @Query private var blockLogs: [BlockLog]
-    @Query private var entries: [BlockEntry]
     @State private var showingNew = false
 
     private var visible: [Area] { areas.filter { !$0.isDeleted && !$0.isArchived } }
     private var classes: [Area] { areas.filter { !$0.isDeleted && $0.isClassesCalendar } }
-
-    private var snapshot: InsightSnapshot {
-        _ = (items, blockLogs, entries)
-        return computeInsights(context: store.context, events: google.cachedEvents)
-    }
 
     var body: some View {
         NavigationStack {
@@ -50,7 +42,7 @@ struct AreasView: View {
     }
 
     private func form(of area: Area) -> Double? {
-        snapshot.areas.first { $0.areaId == area.id }?.formPercent
+        insights.area(area.id)?.formPercent
     }
 
     private func move(from source: IndexSet, to destination: Int) {

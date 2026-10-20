@@ -13,31 +13,51 @@ public enum GoogleAPIError: Error, LocalizedError {
         }
     }
 
+    /// True only when signing in again would help. Rate limits and quota 403s are not auth errors.
     public var isAuthError: Bool {
-        if case .http(let code, _) = self { return code == 401 || code == 403 }
-        if case .unauthorized = self { return true }
-        return false
+        switch self {
+        case .unauthorized: return true
+        case .http(let code, let msg):
+            if code == 401 { return true }
+            let m = msg.lowercased()
+            return code == 403 && (m.contains("insufficient") || m.contains("scope"))
+        case .decoding: return false
+        }
     }
 }
 
 /// ISO-8601 / RFC 3339 formatting used by the Google Calendar API.
 public enum GoogleDateFormat {
-    public static func format(_ date: Date) -> String {
+    private static func make(_ format: String) -> DateFormatter {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "yyyy-MM-dd'T'HH:mm:ssXXXXX"
-        f.timeZone = .current
-        return f.string(from: date)
+        f.dateFormat = format
+        return f
+    }
+    private static let plain = make("yyyy-MM-dd'T'HH:mm:ssXXXXX")
+    private static let fractional = make("yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX")
+    private static let lock = NSLock()
+
+    public static func format(_ date: Date) -> String {
+        lock.lock(); defer { lock.unlock() }
+        plain.timeZone = .current
+        return plain.string(from: date)
     }
 
     public static func parse(_ s: String) -> Date? {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "yyyy-MM-dd'T'HH:mm:ssXXXXX"
-        if let d = f.date(from: s) { return d }
-        let g = DateFormatter()
-        g.locale = Locale(identifier: "en_US_POSIX")
-        g.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX"
-        return g.date(from: s)
+        lock.lock(); defer { lock.unlock() }
+        return plain.date(from: s) ?? fractional.date(from: s)
+    }
+}
+
+/// Network failures that mean "offline", not "signed out".
+public func isOfflineError(_ error: Error) -> Bool {
+    guard let e = error as? URLError else { return false }
+    switch e.code {
+    case .notConnectedToInternet, .networkConnectionLost, .timedOut, .cannotFindHost,
+         .cannotConnectToHost, .dnsLookupFailed, .dataNotAllowed, .internationalRoamingOff:
+        return true
+    default:
+        return false
     }
 }

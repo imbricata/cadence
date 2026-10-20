@@ -11,12 +11,16 @@ import AppKit
 public enum GoogleAuthError: Error, LocalizedError {
     case missingClientID
     case cancelled
+    case notSignedIn
+    case invalidGrant
     case badResponse(String)
 
     public var errorDescription: String? {
         switch self {
         case .missingClientID: return "Google Client ID is not configured."
         case .cancelled: return "Sign-in cancelled."
+        case .notSignedIn: return "Not signed in to Google."
+        case .invalidGrant: return "Google sign-in expired. Please reconnect."
         case .badResponse(let m): return "Google sign-in failed: \(m)"
         }
     }
@@ -48,8 +52,8 @@ public final class GoogleAuth {
 
     public private(set) var tokens: OAuthTokens?
 
-    public init() {
-        tokens = KeychainStore.load()
+    public init(loadFromKeychain: Bool = true) {
+        tokens = loadFromKeychain ? KeychainStore.load() : nil
     }
 
     public var isAuthorized: Bool {
@@ -86,7 +90,7 @@ public final class GoogleAuth {
     }
 
     public func accessToken() async throws -> String {
-        guard var t = tokens else { throw GoogleAuthError.missingClientID }
+        guard var t = tokens else { throw GoogleAuthError.notSignedIn }
         if t.expiresAt.timeIntervalSinceNow < 90, let refresh = t.refreshToken {
             t = try await Self.refreshToken(refresh, clientID: GoogleAuthConfig.clientID)
             tokens = t
@@ -172,6 +176,7 @@ public final class GoogleAuth {
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             let msg = String(data: data, encoding: .utf8) ?? "unknown error"
+            if msg.contains("invalid_grant") { throw GoogleAuthError.invalidGrant }
             throw GoogleAuthError.badResponse(msg)
         }
         struct TokenResponse: Decodable {
@@ -217,7 +222,8 @@ final class AuthPresentationContext: NSObject, ASWebAuthenticationPresentationCo
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
         if let win = scenes.flatMap(\.windows).first(where: { $0.isKeyWindow }) { return win }
         if let win = scenes.first?.windows.first { return win }
-        return UIWindow()
+        if let scene = scenes.first { return UIWindow(windowScene: scene) }
+        return ASPresentationAnchor()
         #elseif os(macOS)
         return NSApp.keyWindow ?? NSApp.windows.first ?? NSWindow()
         #endif

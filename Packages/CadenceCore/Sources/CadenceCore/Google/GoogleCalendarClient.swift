@@ -17,6 +17,7 @@ public struct GoogleEvent: Codable, Identifiable, Sendable {
     public var end: GoogleEventTime?
     public var colorId: String?
     public var extendedProperties: GoogleExtendedProperties?
+    public var status: String?
 }
 
 public struct GoogleEventTime: Codable, Sendable {
@@ -36,6 +37,14 @@ public struct GoogleCalendarList: Codable, Sendable {
 
 public struct GoogleEventList: Codable, Sendable {
     public var items: [GoogleEvent]
+    public var nextPageToken: String?
+
+    public init(items: [GoogleEvent], nextPageToken: String? = nil) { self.items = items; self.nextPageToken = nextPageToken }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        items = try c.decodeIfPresent([GoogleEvent].self, forKey: .items) ?? []
+        nextPageToken = try c.decodeIfPresent(String.self, forKey: .nextPageToken)
+    }
 }
 
 /// A normalized event for display, tagged with its source calendar.
@@ -47,6 +56,11 @@ public struct CalendarEvent: Identifiable, Codable, Sendable {
     public var calendarId: String
     public var isAllDay: Bool
     public var isCadenceBlock: Bool
+
+    /// A zero-length timed event (e.g. an assignment due date). Shown as a marker, never as a block.
+    public var isDeadline: Bool { !isAllDay && end <= start }
+    /// Belongs in the all-day strip rather than the hour grid.
+    public var isAllDayLike: Bool { isAllDay || isDeadline }
 
     public init(id: String, summary: String, start: Date, end: Date, calendarId: String, isAllDay: Bool = false, isCadenceBlock: Bool = false) {
         self.id = id; self.summary = summary; self.start = start; self.end = end
@@ -70,8 +84,9 @@ public struct GoogleCalendarAPI: Sendable {
     }
 
     @discardableResult
-    public func createCalendar(accessToken: String, name: String) async throws -> String {
-        let body: [String: String] = ["summary": name]
+    public func createCalendar(accessToken: String, name: String, description: String? = nil) async throws -> String {
+        var body: [String: String] = ["summary": name]
+        if let description { body["description"] = description }
         let data = try await request("/calendars", token: accessToken, method: "POST", body: try encode(body))
         struct Created: Decodable { let id: String }
         return try decode(Created.self, data).id
@@ -93,15 +108,31 @@ public struct GoogleCalendarAPI: Sendable {
     // MARK: Events
 
     public func listEvents(accessToken: String, calendarId: String, start: Date, end: Date) async throws -> [GoogleEvent] {
-        let query = [
-            ("timeMin", GoogleDateFormat.format(start)),
-            ("timeMax", GoogleDateFormat.format(end)),
-            ("singleEvents", "true"),
-            ("orderBy", "startTime"),
-            ("timeZone", TimeZone.current.identifier)
-        ]
-        let data = try await request("/calendars/\(Self.pathEscape(calendarId))/events", token: accessToken, query: query)
-        return try decode(GoogleEventList.self, data).items
+        var all: [GoogleEvent] = []
+        var pageToken: String?
+        repeat {
+            var query = [
+                ("timeMin", GoogleDateFormat.format(start)),
+                ("timeMax", GoogleDateFormat.format(end)),
+                ("singleEvents", "true"),
+                ("orderBy", "startTime"),
+                ("maxResults", "2500"),
+                ("timeZone", TimeZone.current.identifier),
+                ("fields", "nextPageToken,items(id,summary,status,start,end,extendedProperties/private)")
+            ]
+            if let pageToken { query.append(("pageToken", pageToken)) }
+            let data = try await request("/calendars/\(Self.pathEscape(calendarId))/events", token: accessToken, query: query)
+            let page = try decode(GoogleEventList.self, data)
+            all.append(contentsOf: page.items.filter { $0.status != "cancelled" })
+            pageToken = page.nextPageToken
+        } while pageToken != nil
+        return all
+    }
+
+    /// Undo for delete: Google keeps a deleted event as `cancelled`, and PATCHing it back restores it.
+    public func restoreEvent(accessToken: String, calendarId: String, eventId: String) async throws {
+        let data = try JSONSerialization.data(withJSONObject: ["status": "confirmed"])
+        _ = try await request("/calendars/\(Self.pathEscape(calendarId))/events/\(Self.pathEscape(eventId))", token: accessToken, method: "PATCH", body: data)
     }
 
     @discardableResult
@@ -111,7 +142,8 @@ public struct GoogleCalendarAPI: Sendable {
             start: GoogleEventTime(dateTime: GoogleDateFormat.format(start), timeZone: TimeZone.current.identifier),
             end: GoogleEventTime(dateTime: GoogleDateFormat.format(end), timeZone: TimeZone.current.identifier),
             colorId: nil,
-            extendedProperties: GoogleExtendedProperties(custom: ["cadence": "1"])
+            extendedProperties: GoogleExtendedProperties(custom: ["cadence": "1"]),
+            status: nil
         )
         let data = try await request("/calendars/\(Self.pathEscape(calendarId))/events", token: accessToken, method: "POST", body: try encode(event))
         return try decode(GoogleEvent.self, data)

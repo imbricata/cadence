@@ -4,12 +4,10 @@ import CadenceCore
 
 struct AreaDetailView: View {
     @Environment(AppStore.self) private var store
-    @Environment(GoogleService.self) private var google
+    @Environment(InsightsModel.self) private var insights
     let area: Area
 
     @Query private var items: [Item]
-    @Query private var blockLogs: [BlockLog]
-    @Query private var entries: [BlockEntry]
     @State private var showingItems = false
     @State private var showingEdit = false
     @State private var editingItem: Item?
@@ -22,11 +20,8 @@ struct AreaDetailView: View {
     }
     private var doneTasks: [Item] { areaItems.filter { $0.kind == .task && $0.status != .open } }
 
-    private var snapshot: InsightSnapshot {
-        _ = (items, blockLogs, entries)
-        return computeInsights(context: store.context, events: google.cachedEvents)
-    }
-    private var areaStat: AreaStat? { snapshot.areas.first { $0.areaId == area.id } }
+    private var snapshot: InsightSnapshot { insights.snapshot }
+    private var areaStat: AreaStat? { insights.area(area.id) }
 
     var body: some View {
         List {

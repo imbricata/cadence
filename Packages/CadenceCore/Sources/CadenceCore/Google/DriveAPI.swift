@@ -89,4 +89,11 @@ public enum DriveAPIError: Error, LocalizedError {
         case .http(let c, let m): return "Google Drive error \(c): \(m)"
         }
     }
+
+    public var isAuthError: Bool {
+        switch self {
+        case .unauthorized: return true
+        case .http(let c, _): return c == 401
+        }
+    }
 }
