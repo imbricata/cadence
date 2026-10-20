@@ -67,7 +67,7 @@ struct PlanView: View {
             NewBlockSheet(initialDate: newBlockStart, initialStart: newBlockStart)
         }
         .sheet(item: $blockTarget) { target in
-            BlockFillLogView(event: target.event, area: target.area)
+            BlockDetailView(event: target.event, area: target.area)
         }
     }
 

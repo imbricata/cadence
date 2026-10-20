@@ -56,3 +56,12 @@ Every non-obvious choice made while building, one line each. Appended chronologi
 - Bundle IDs renamed to `com.theocoronges.cadence` / `.widgets` / `.mac` because `com.cadence.ios` was already registered by someone else on Apple's Personal Team registry (Xcode "cannot register ... not available").
 - Widget removed at owner request (app-only install). App icons added: single-size 1024 for iOS, full multi-size set for macOS, generated from the Cadence mark (teal bars on light background, full-bleed opaque).
 - Classes can now be an ICS feed URL instead of a Google calendar: the app fetches + parses the raw `.ics` directly (auto-updating), because Google's Calendar API returns 400 for URL-subscribed calendars (e.g. Blackboard Learn feeds).
+
+## Overhaul
+
+- Phase 1: added `LogOutcome.planned` (weight 0) = "in the block, not logged". Planning (`planItem`) never touches scores or tasks; only `logBlock` / `setEntryOutcome` do. Opening a block no longer creates a `BlockLog`.
+- Scores count only Full/Easy entries in blocks that are not `unlogged`; Skipped and planned are 0 minutes. Block-level minutes are used only when a block has no item entries.
+- Form uses a dense daily series (zero-filled) from the first logged day; today is included only once something is logged, so mornings don't drag form down.
+- Default minutes: Full = item's share of the block, Easy = half of that (rounded to 5), Skipped = 0.
+- Follow-through: planned = non-Classes, non-all-day, non-zero-length events on Area calendars that have started, plus logged blocks missing from the cache. Per-day/week values are sums, keyed by event id + start.
+- `InboxNote.isLowConfidence` added (default false, `decodeIfPresent` in sync). Sync now refuses to overwrite a Drive file it cannot decode (throws `SyncError.undecodable`) instead of treating it as empty. **Update both devices together** after this change: an old build cannot decode the new `planned` outcome.

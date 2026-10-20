@@ -11,9 +11,56 @@ public enum ScoringConfig {
     public static let levelHours: [Double] = [10, 25, 50, 100, 250, 500, 1000]
 }
 
+/// Minutes that count toward form. Only Full and Easy are work; Easy is weighted down.
+/// Skipped and planned entries never count.
 public func easyWeightedMinutes(outcome: LogOutcome, minutes: Double) -> Double {
     let base = max(0, minutes)
-    return outcome == .easy ? base * ScoringConfig.easyWeight : base
+    switch outcome {
+    case .full: return base
+    case .easy: return base * ScoringConfig.easyWeight
+    case .skipped, .planned: return 0
+    }
+}
+
+/// Default logged minutes for one item in a block: Full = its share of the block,
+/// Easy = half of that (rounded to 5), Skipped / planned = 0.
+public func defaultEntryMinutes(outcome: LogOutcome, blockMinutes: Int, itemCount: Int) -> Int {
+    let share = max(5, blockMinutes / max(1, itemCount))
+    switch outcome {
+    case .full: return share
+    case .easy: return max(5, Int((Double(share) / 2 / 5).rounded()) * 5)
+    case .skipped, .planned: return 0
+    }
+}
+
+/// Default logged minutes for a whole block when it has no item entries.
+public func defaultBlockMinutes(state: BlockLogState, plannedMinutes: Int) -> Int {
+    switch state {
+    case .full: return plannedMinutes
+    case .easy: return max(5, Int((Double(plannedMinutes) / 2 / 5).rounded()) * 5)
+    case .skipped, .unlogged: return 0
+    }
+}
+
+/// Exponentially weighted average over a **dense** daily series: every calendar day from
+/// `firstDay` to `lastDay` is included, with 0 for days that have no value.
+public func denseExponentialAverage(
+    daily: [Date: Double], firstDay: Date, lastDay: Date, halfLife: Double, calendar: Calendar = .current
+) -> Double {
+    let first = calendar.startOfDay(for: firstDay)
+    let last = calendar.startOfDay(for: lastDay)
+    guard last >= first else { return 0 }
+    let count = (calendar.dateComponents([.day], from: first, to: last).day ?? 0) + 1
+    var values: [Double] = []
+    var ages: [Double] = []
+    values.reserveCapacity(count)
+    ages.reserveCapacity(count)
+    for i in 0..<count {
+        let day = calendar.date(byAdding: .day, value: i, to: first) ?? first
+        values.append(daily[day] ?? 0)
+        ages.append(Double(count - 1 - i))
+    }
+    return exponentiallyWeightedAverage(values: values, agesInDays: ages, halfLife: halfLife)
 }
 
 /// Weighted average of daily values, weighted toward recent days.

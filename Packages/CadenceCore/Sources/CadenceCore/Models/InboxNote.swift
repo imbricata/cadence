@@ -13,6 +13,7 @@ public final class InboxNote: SyncedModel {
     public var resultingItemId: UUID?
     public var sortedAt: Date?
     public var failureCount: Int
+    public var isLowConfidence: Bool = false
 
     public init(
         id: UUID = UUID(),
@@ -23,7 +24,8 @@ public final class InboxNote: SyncedModel {
         state: InboxNoteState = .pending,
         resultingItemId: UUID? = nil,
         sortedAt: Date? = nil,
-        failureCount: Int = 0
+        failureCount: Int = 0,
+        isLowConfidence: Bool = false
     ) {
         self.id = id
         self.updatedAt = updatedAt
@@ -34,5 +36,6 @@ public final class InboxNote: SyncedModel {
         self.resultingItemId = resultingItemId
         self.sortedAt = sortedAt
         self.failureCount = failureCount
+        self.isLowConfidence = isLowConfidence
     }
 }

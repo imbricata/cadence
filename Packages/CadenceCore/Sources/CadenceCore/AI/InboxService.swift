@@ -104,6 +104,7 @@ public final class InboxService {
         }
 
         note.resultingItemId = itemId
+        note.isLowConfidence = result.confidence == "low"
         note.state = .sorted
         note.sortedAt = .now
         note.updatedAt = .now

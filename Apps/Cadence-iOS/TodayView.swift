@@ -78,7 +78,7 @@ struct TodayView: View {
             }
         }
         .sheet(item: $blockTarget) { target in
-            BlockFillLogView(event: target.event, area: target.area)
+            BlockDetailView(event: target.event, area: target.area)
         }
         .sheet(isPresented: $showNewBlock) {
             NewBlockSheet(initialDate: date, initialStart: date)

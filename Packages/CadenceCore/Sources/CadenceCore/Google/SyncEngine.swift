@@ -65,11 +65,28 @@ public struct InboxNoteSnapshot: SyncRecord {
     public var resultingItemId: UUID?
     public var sortedAt: Date?
     public var failureCount: Int
+    public var isLowConfidence: Bool
 
     public init(_ m: InboxNote) {
         id = m.id; updatedAt = m.updatedAt; isDeleted = m.isDeleted
         rawText = m.rawText; createdAt = m.createdAt; state = m.state
         resultingItemId = m.resultingItemId; sortedAt = m.sortedAt; failureCount = m.failureCount
+        isLowConfidence = m.isLowConfidence
+    }
+
+    // Older sync files have no `isLowConfidence`.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        updatedAt = try c.decode(Date.self, forKey: .updatedAt)
+        isDeleted = try c.decode(Bool.self, forKey: .isDeleted)
+        rawText = try c.decode(String.self, forKey: .rawText)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        state = try c.decode(InboxNoteState.self, forKey: .state)
+        resultingItemId = try c.decodeIfPresent(UUID.self, forKey: .resultingItemId)
+        sortedAt = try c.decodeIfPresent(Date.self, forKey: .sortedAt)
+        failureCount = try c.decodeIfPresent(Int.self, forKey: .failureCount) ?? 0
+        isLowConfidence = try c.decodeIfPresent(Bool.self, forKey: .isLowConfidence) ?? false
     }
 }
 
@@ -142,6 +159,15 @@ public struct TargetSnapshot: SyncRecord {
 
 // MARK: - Engine
 
+public enum SyncError: Error, LocalizedError {
+    case undecodable(String)
+    public var errorDescription: String? {
+        switch self {
+        case .undecodable(let n): return "Sync file \(n) was written by a newer version of Cadence. Update this device."
+        }
+    }
+}
+
 public struct SyncSummary: Sendable {
     public var lastSyncAt: Date = .now
     public var uploaded: Int = 0
@@ -150,7 +176,7 @@ public struct SyncSummary: Sendable {
 
 @MainActor
 public final class SyncEngine {
-    static let purgeInterval: TimeInterval = 90 * 24 * 3600
+    public static let purgeInterval: TimeInterval = 90 * 24 * 3600
 
     private let drive = DriveAPI()
 
@@ -199,7 +225,9 @@ public final class SyncEngine {
         var remote: [T] = []
         if let fileId = files[name] {
             let data = try await drive.downloadFile(accessToken: token, fileId: fileId)
-            remote = (try? JSONDecoder().decode([T].self, from: data)) ?? []
+            // Never fall back to "empty": that would overwrite the remote file with local-only data.
+            do { remote = try JSONDecoder().decode([T].self, from: data) }
+            catch { throw SyncError.undecodable(name) }
         }
 
         var applied = 0
@@ -227,7 +255,7 @@ public final class SyncEngine {
 
     /// Newest updatedAt wins. Returns the merged record set (tombstones older than the purge
     /// interval are dropped).
-    static func merge<T: SyncRecord>(remote: [T], local: [T], apply: (T) -> Void) -> [T] {
+    public static func merge<T: SyncRecord>(remote: [T], local: [T], apply: (T) -> Void) -> [T] {
         var merged: [UUID: T] = Dictionary(uniqueKeysWithValues: remote.map { ($0.id, $0) })
         let localIds = Set(local.map(\.id))
         let cutoff = Date().addingTimeInterval(-purgeInterval)
@@ -286,10 +314,11 @@ public final class SyncEngine {
             ex.updatedAt = s.updatedAt; ex.isDeleted = false
             ex.rawText = s.rawText; ex.state = s.state; ex.resultingItemId = s.resultingItemId
             ex.sortedAt = s.sortedAt; ex.failureCount = s.failureCount
+            ex.isLowConfidence = s.isLowConfidence
         } else if !s.isDeleted {
             context.insert(InboxNote(id: s.id, updatedAt: s.updatedAt, rawText: s.rawText, createdAt: s.createdAt,
                                      state: s.state, resultingItemId: s.resultingItemId, sortedAt: s.sortedAt,
-                                     failureCount: s.failureCount))
+                                     failureCount: s.failureCount, isLowConfidence: s.isLowConfidence))
         }
     }
 

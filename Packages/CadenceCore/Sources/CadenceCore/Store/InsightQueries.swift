@@ -33,10 +33,24 @@ public struct FollowThroughReport: Sendable {
     public var days: [DayFollowThrough]
 }
 
+public struct WeekFollowThrough: Sendable {
+    public var weekStart: Date
+    public var planned: Int
+    public var loggedWeight: Double
+    public var percent: Double?
+}
+
 public struct InsightSnapshot: Sendable {
     public var areas: [AreaStat]
     public var activities: [ActivityStat]
     public var followThrough: FollowThroughReport
+    public var weeks: [WeekFollowThrough]
+
+    public static let empty = InsightSnapshot(
+        areas: [], activities: [],
+        followThrough: FollowThroughReport(planned: 0, loggedWeight: 0, percent: nil, days: []),
+        weeks: []
+    )
 }
 
 private struct Contribution {
@@ -49,6 +63,29 @@ private struct Contribution {
     var weighted: Double { easyWeightedMinutes(outcome: outcome, minutes: Double(minutes)) }
 }
 
+/// Everything that counts as time actually spent. Planned items, unlogged blocks and skipped entries are excluded.
+private func workContributions(
+    blockLogs: [BlockLog], entries: [BlockEntry], unplanned: [UnplannedLog]
+) -> [Contribution] {
+    var result: [Contribution] = []
+    let logsByID = Dictionary(blockLogs.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+    var logsWithEntries = Set<UUID>()
+    for entry in entries {
+        guard let log = logsByID[entry.blockLogId] else { continue }
+        logsWithEntries.insert(log.id)
+        guard log.state != .unlogged, entry.outcome.countsAsWork, entry.minutes > 0 else { continue }
+        result.append(Contribution(areaId: log.areaId, itemId: entry.itemId, date: log.eventStart, outcome: entry.outcome, minutes: entry.minutes))
+    }
+    for log in blockLogs where !logsWithEntries.contains(log.id) {
+        guard log.state == .full || log.state == .easy, log.loggedMinutes > 0 else { continue }
+        result.append(Contribution(areaId: log.areaId, itemId: nil, date: log.eventStart, outcome: LogOutcome(log.state), minutes: log.loggedMinutes))
+    }
+    for u in unplanned where u.outcome.countsAsWork && u.minutes > 0 {
+        result.append(Contribution(areaId: u.areaId, itemId: u.itemId, date: u.date, outcome: u.outcome, minutes: u.minutes))
+    }
+    return result
+}
+
 public func computeInsights(context: ModelContext, events: [CalendarEvent], now: Date = .now) -> InsightSnapshot {
     let areas = allAreas(in: context)
     let items = allItems(in: context)
@@ -57,41 +94,31 @@ public func computeInsights(context: ModelContext, events: [CalendarEvent], now:
     let unplanned = allUnplannedLogs(in: context)
     let targets = allTargets(in: context)
 
-    var contributions: [Contribution] = []
-    let logsByID = Dictionary(uniqueKeysWithValues: blockLogs.map { ($0.id, $0) })
-
-    for entry in entries {
-        guard let log = logsByID[entry.blockLogId] else { continue }
-        contributions.append(Contribution(areaId: log.areaId, itemId: entry.itemId, date: log.eventStart, outcome: entry.outcome, minutes: entry.minutes))
-    }
-    for log in blockLogs {
-        let hasEntries = entries.contains { $0.blockLogId == log.id }
-        if !hasEntries, log.state == .full || log.state == .easy, log.loggedMinutes > 0 {
-            let outcome: LogOutcome = log.state == .easy ? .easy : .full
-            contributions.append(Contribution(areaId: log.areaId, itemId: nil, date: log.eventStart, outcome: outcome, minutes: log.loggedMinutes))
-        }
-    }
-    for u in unplanned {
-        contributions.append(Contribution(areaId: u.areaId, itemId: u.itemId, date: u.date, outcome: u.outcome, minutes: u.minutes))
-    }
+    let contributions = workContributions(blockLogs: blockLogs, entries: entries, unplanned: unplanned)
 
     // Areas (excluding classes)
     var areaStats: [AreaStat] = []
     let cal = Calendar.current
+    let today = cal.startOfDay(for: now)
     for area in areas where !area.isClassesCalendar && !area.isArchived {
         let cs = contributions.filter { $0.areaId == area.id }
         let raw = cs.reduce(0) { $0 + $1.minutes }
         let daily: [Date: Double] = Dictionary(grouping: cs) { cal.startOfDay(for: $0.date) }
             .mapValues { $0.reduce(0) { $0 + $1.weighted } }
-        let recent = ewDaily(daily, halfLife: ScoringConfig.recentHalfLifeDays, now: now)
-        let baseline = ewDaily(daily, halfLife: ScoringConfig.baselineHalfLifeDays, now: now)
+
+        let firstDate = cs.map(\.date).min() ?? area.createdAt
+        let firstDay = cal.startOfDay(for: firstDate)
+        // Today only counts once something is logged, so mornings don't drag form down.
+        var lastDay = (daily[today] ?? 0) > 0 ? today : (cal.date(byAdding: .day, value: -1, to: today) ?? today)
+        if lastDay < firstDay { lastDay = firstDay }
+        let recent = denseExponentialAverage(daily: daily, firstDay: firstDay, lastDay: lastDay, halfLife: ScoringConfig.recentHalfLifeDays)
+        let baseline = denseExponentialAverage(daily: daily, firstDay: firstDay, lastDay: lastDay, halfLife: ScoringConfig.baselineHalfLifeDays)
 
         let target = targets.first { $0.areaId == area.id && !$0.isDeleted }
         let hasTarget = target?.weeklyMinutes != nil
         var reference = baseline
         if let weekly = target?.weeklyMinutes { reference = Double(weekly) / 7 }
 
-        let firstDate = cs.map(\.date).min() ?? area.createdAt
         let observed = daysObserved(firstDate: firstDate, now: now)
         let percent = formPercentage(recent: recent, reference: reference, daysObserved: observed, hasTarget: hasTarget)
 
@@ -110,96 +137,111 @@ public func computeInsights(context: ModelContext, events: [CalendarEvent], now:
     }
 
     // Activities (hours + levels)
-    let classIds = Set(areas.filter { $0.isClassesCalendar }.map(\.googleCalendarId))
     var activityMinutes: [UUID: Int] = [:]
-    for c in contributions where c.itemId != nil {
-        activityMinutes[c.itemId!, default: 0] += c.minutes
+    for c in contributions {
+        if let id = c.itemId { activityMinutes[id, default: 0] += c.minutes }
     }
     let activityStats = items.filter { $0.kind == .activity }
         .map { item in
             ActivityStat(itemId: item.id, rawMinutes: activityMinutes[item.id] ?? 0, level: level(forHours: totalHours(minutes: activityMinutes[item.id] ?? 0)))
         }
 
-    // Follow-through (last 7 days)
-    var ft = followThrough(context: context, areas: areas, blockLogs: blockLogs, events: events, classIds: classIds, now: now)
+    // Follow-through
+    let areaCalendarIds = Set(areas.filter { !$0.isClassesCalendar && !$0.googleCalendarId.isEmpty }.map(\.googleCalendarId))
+    let (report, weeks) = followThrough(areaCalendarIds: areaCalendarIds, blockLogs: blockLogs, events: events, now: now)
 
-    ft.days.sort { $0.date < $1.date }
-
-    return InsightSnapshot(areas: areaStats, activities: activityStats, followThrough: ft)
+    return InsightSnapshot(areas: areaStats, activities: activityStats, followThrough: report, weeks: weeks)
 }
 
-private func ewDaily(_ daily: [Date: Double], halfLife: Double, now: Date) -> Double {
-    let entries = daily.map { (date: $0.key, value: $0.value) }
-    let values = entries.map(\.value)
-    let ages = entries.map { max(0, now.timeIntervalSince($0.date) / 86400) }
-    return exponentiallyWeightedAverage(values: values, agesInDays: ages, halfLife: halfLife)
+// MARK: - Follow-through
+
+private struct PlannedBlockRecord {
+    var start: Date
+    var weight: Double
 }
 
-private func followThrough(context: ModelContext, areas: [Area], blockLogs: [BlockLog], events: [CalendarEvent], classIds: Set<String>, now: Date) -> FollowThroughReport {
-    let cal = Calendar.current
-    let windowStart = cal.startOfDay(for: cal.date(byAdding: .day, value: -6, to: now)!)
-
-    let plannedEventIds = events
-        .filter { !classIds.contains($0.calendarId) && $0.start >= windowStart && $0.start <= now }
-        .map(\.id)
-    var allPlanned = Set(plannedEventIds)
-    for log in blockLogs where log.eventStart >= windowStart {
-        allPlanned.insert(log.googleEventId)
-    }
+/// One record per planned block that has already started: Area-calendar events plus logged blocks
+/// that aren't (or are no longer) in the event cache. Planned blocks in the future never count.
+private func plannedBlockRecords(
+    areaCalendarIds: Set<String>, blockLogs: [BlockLog], events: [CalendarEvent], from: Date, now: Date
+) -> [PlannedBlockRecord] {
+    func key(_ id: String, _ start: Date) -> String { "\(id)|\(Int(start.timeIntervalSince1970))" }
 
     var weights: [String: Double] = [:]
-    for log in blockLogs where log.eventStart >= windowStart && log.eventStart <= now {
-        let w = blockLogWeight(log.state)
-        weights[log.googleEventId] = max(weights[log.googleEventId] ?? 0, w)
+    for log in blockLogs {
+        let k = key(log.googleEventId, log.eventStart)
+        weights[k] = max(weights[k] ?? 0, blockLogWeight(log.state))
     }
 
-    let plannedCount = allPlanned.count
-    var loggedWeight = 0.0
-    for id in allPlanned { loggedWeight += weights[id] ?? 0 }
-
-    var days: [DayFollowThrough] = []
-    for i in 0..<7 {
-        let day = cal.date(byAdding: .day, value: i, to: windowStart)!
-        let interval = cal.dateInterval(of: .day, for: day)!
-        let planned = events.filter { !classIds.contains($0.calendarId) && interval.contains($0.start) }.count
-        var w = 0.0
-        for log in blockLogs where interval.contains(log.eventStart) {
-            w = max(w, blockLogWeight(log.state))
-        }
-        days.append(DayFollowThrough(date: day, planned: planned, loggedWeight: w))
+    var seen = Set<String>()
+    var records: [PlannedBlockRecord] = []
+    for e in events where areaCalendarIds.contains(e.calendarId) && !e.isAllDay && e.end > e.start && e.start >= from && e.start <= now {
+        let k = key(e.id, e.start)
+        guard seen.insert(k).inserted else { continue }
+        records.append(PlannedBlockRecord(start: e.start, weight: weights[k] ?? 0))
     }
-
-    return FollowThroughReport(
-        planned: plannedCount,
-        loggedWeight: loggedWeight,
-        percent: followThroughPercent(planned: plannedCount, loggedWeight: loggedWeight),
-        days: days
-    )
+    // Logged blocks whose event isn't cached still count (they were planned).
+    for log in blockLogs where log.state != .unlogged && log.eventStart >= from && log.eventStart <= now {
+        let k = key(log.googleEventId, log.eventStart)
+        guard seen.insert(k).inserted else { continue }
+        records.append(PlannedBlockRecord(start: log.eventStart, weight: blockLogWeight(log.state)))
+    }
+    return records
 }
 
-/// Observed weekly minute totals (newest last) for target proposals.
-public func weeklyMinuteTotals(areaId: UUID, context: ModelContext, now: Date = .now) -> [Int] {
-    let blockLogs = allBlockLogs(in: context)
-    let entries = allBlockEntries(in: context)
-    let unplanned = allUnplannedLogs(in: context)
-    let logsByID = Dictionary(uniqueKeysWithValues: blockLogs.map { ($0.id, $0) })
-
-    var totals: [String: Int] = [:]
+private func followThrough(
+    areaCalendarIds: Set<String>, blockLogs: [BlockLog], events: [CalendarEvent], now: Date
+) -> (FollowThroughReport, [WeekFollowThrough]) {
     let cal = Calendar.current
-    func weekKey(_ date: Date) -> String {
-        let c = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
-        return "\(c.yearForWeekOfYear ?? 0)-\(c.weekOfYear ?? 0)"
+    let weekCount = 8
+    let thisWeekStart = cal.dateInterval(of: .weekOfYear, for: now)?.start ?? cal.startOfDay(for: now)
+    let firstWeekStart = cal.date(byAdding: .weekOfYear, value: -(weekCount - 1), to: thisWeekStart) ?? thisWeekStart
+    let windowStart = cal.startOfDay(for: cal.date(byAdding: .day, value: -(ScoringConfig.followThroughWindowDays - 1), to: now) ?? now)
+
+    let records = plannedBlockRecords(
+        areaCalendarIds: areaCalendarIds, blockLogs: blockLogs, events: events,
+        from: min(firstWeekStart, windowStart), now: now
+    )
+
+    let recent = records.filter { $0.start >= windowStart }
+    let plannedCount = recent.count
+    let weight = recent.reduce(0) { $0 + $1.weight }
+
+    var days: [DayFollowThrough] = []
+    for i in 0..<ScoringConfig.followThroughWindowDays {
+        let day = cal.date(byAdding: .day, value: i, to: windowStart) ?? windowStart
+        guard let interval = cal.dateInterval(of: .day, for: day) else { continue }
+        let inDay = records.filter { interval.contains($0.start) }
+        days.append(DayFollowThrough(date: day, planned: inDay.count, loggedWeight: inDay.reduce(0) { $0 + $1.weight }))
     }
-    for entry in entries {
-        guard let log = logsByID[entry.blockLogId], log.areaId == areaId else { continue }
-        totals[weekKey(log.eventStart), default: 0] += entry.minutes
+
+    var weeks: [WeekFollowThrough] = []
+    for i in 0..<weekCount {
+        let start = cal.date(byAdding: .weekOfYear, value: i, to: firstWeekStart) ?? firstWeekStart
+        let end = cal.date(byAdding: .weekOfYear, value: 1, to: start) ?? start
+        let inWeek = records.filter { $0.start >= start && $0.start < end }
+        let w = inWeek.reduce(0) { $0 + $1.weight }
+        weeks.append(WeekFollowThrough(weekStart: start, planned: inWeek.count, loggedWeight: w, percent: followThroughPercent(planned: inWeek.count, loggedWeight: w)))
     }
-    for log in blockLogs where log.areaId == areaId {
-        let hasEntries = entries.contains { $0.blockLogId == log.id }
-        if !hasEntries { totals[weekKey(log.eventStart), default: 0] += log.loggedMinutes }
-    }
-    for u in unplanned where u.areaId == areaId {
-        totals[weekKey(u.date), default: 0] += u.minutes
+
+    let report = FollowThroughReport(
+        planned: plannedCount, loggedWeight: weight,
+        percent: followThroughPercent(planned: plannedCount, loggedWeight: weight), days: days
+    )
+    return (report, weeks)
+}
+
+/// Observed weekly minute totals (oldest first) for target proposals. Counts logged work only.
+public func weeklyMinuteTotals(areaId: UUID, context: ModelContext, now: Date = .now) -> [Int] {
+    let contributions = workContributions(
+        blockLogs: allBlockLogs(in: context), entries: allBlockEntries(in: context), unplanned: allUnplannedLogs(in: context)
+    ).filter { $0.areaId == areaId }
+
+    let cal = Calendar.current
+    var totals: [Date: Int] = [:]
+    for c in contributions {
+        let week = cal.dateInterval(of: .weekOfYear, for: c.date)?.start ?? c.date
+        totals[week, default: 0] += c.minutes
     }
     return totals.keys.sorted().map { totals[$0] ?? 0 }
 }

@@ -25,6 +25,8 @@ public enum BlockLogState: String, Codable, CaseIterable, Sendable {
 }
 
 public enum LogOutcome: String, Codable, CaseIterable, Sendable {
+    /// In the block but not logged yet (a plan, never counted as work).
+    case planned
     case full
     case easy
     case skipped
@@ -33,7 +35,19 @@ public enum LogOutcome: String, Codable, CaseIterable, Sendable {
         switch self {
         case .full: return 1.0
         case .easy: return 0.75
-        case .skipped: return 0.0
+        case .skipped, .planned: return 0.0
+        }
+    }
+
+    /// True for outcomes that represent time actually spent.
+    public var countsAsWork: Bool { self == .full || self == .easy }
+
+    public init(_ state: BlockLogState) {
+        switch state {
+        case .full: self = .full
+        case .easy: self = .easy
+        case .skipped: self = .skipped
+        case .unlogged: self = .planned
         }
     }
 }

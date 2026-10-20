@@ -7,7 +7,8 @@ final class ScoringTests: XCTestCase {
     func testEasyWeightedMinutes() {
         XCTAssertEqual(easyWeightedMinutes(outcome: .full, minutes: 60), 60, accuracy: 0.001)
         XCTAssertEqual(easyWeightedMinutes(outcome: .easy, minutes: 60), 45, accuracy: 0.001)
-        XCTAssertEqual(easyWeightedMinutes(outcome: .skipped, minutes: 60), 60, accuracy: 0.001)
+        XCTAssertEqual(easyWeightedMinutes(outcome: .skipped, minutes: 60), 0, accuracy: 0.001)
+        XCTAssertEqual(easyWeightedMinutes(outcome: .planned, minutes: 60), 0, accuracy: 0.001)
         XCTAssertEqual(easyWeightedMinutes(outcome: .easy, minutes: -5), 0, accuracy: 0.001)
     }
 
@@ -81,5 +82,24 @@ final class ScoringTests: XCTestCase {
 
     func testFormReturnsNilWhenNoReference() {
         XCTAssertNil(formPercentage(recent: 50, reference: 0, daysObserved: 30, hasTarget: false))
+    }
+
+    func testDefaultMinutes() {
+        XCTAssertEqual(defaultEntryMinutes(outcome: .full, blockMinutes: 60, itemCount: 2), 30)
+        XCTAssertEqual(defaultEntryMinutes(outcome: .easy, blockMinutes: 60, itemCount: 2), 15)
+        XCTAssertEqual(defaultEntryMinutes(outcome: .skipped, blockMinutes: 60, itemCount: 1), 0)
+        XCTAssertEqual(defaultEntryMinutes(outcome: .planned, blockMinutes: 60, itemCount: 1), 0)
+        XCTAssertEqual(defaultBlockMinutes(state: .full, plannedMinutes: 60), 60)
+        XCTAssertEqual(defaultBlockMinutes(state: .easy, plannedMinutes: 60), 30)
+        XCTAssertEqual(defaultBlockMinutes(state: .unlogged, plannedMinutes: 60), 0)
+    }
+
+    func testDenseAverageCountsZeroDays() {
+        // One 70-minute day in a 7-day span: a plain average over days with data would say 70.
+        let cal = Calendar.current
+        let last = cal.startOfDay(for: .now)
+        let first = cal.date(byAdding: .day, value: -6, to: last)!
+        let avg = denseExponentialAverage(daily: [first: 70], firstDay: first, lastDay: last, halfLife: 1_000_000)
+        XCTAssertEqual(avg, 10, accuracy: 0.01)
     }
 }

@@ -47,6 +47,11 @@ public struct CalendarEvent: Identifiable, Codable, Sendable {
     public var calendarId: String
     public var isAllDay: Bool
     public var isCadenceBlock: Bool
+
+    public init(id: String, summary: String, start: Date, end: Date, calendarId: String, isAllDay: Bool = false, isCadenceBlock: Bool = false) {
+        self.id = id; self.summary = summary; self.start = start; self.end = end
+        self.calendarId = calendarId; self.isAllDay = isAllDay; self.isCadenceBlock = isCadenceBlock
+    }
 }
 
 // MARK: - Client
