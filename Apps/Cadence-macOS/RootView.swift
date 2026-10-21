@@ -50,6 +50,7 @@ struct RootView: View {
             Text("Its items stay in your data but disappear from the app. The Google calendar is not deleted.")
         }
         .focusedSceneValue(\.rootActions, RootActions(newNote: { showQuickNote = true }))
+        .onboarding()
         .toastHost()
         #if DEBUG
         .task {

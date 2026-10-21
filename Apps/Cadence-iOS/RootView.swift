@@ -32,6 +32,7 @@ struct RootView: View {
         .environment(\.openSettings, { showSettings = true })
         .sheet(isPresented: $showSettings) { SettingsView() }
         .onChange(of: scenePhase, initial: true) { _, phase in google.setActive(phase == .active) }
+        .onboarding()
         .toastHost()
     }
 
