@@ -17,6 +17,13 @@ public func deleteInboxNote(_ store: AppStore, _ note: InboxNote) {
     store.save()
 }
 
+/// Deleting a card from the Inbox removes the item it created, too.
+@MainActor
+public func deleteInboxCard(_ store: AppStore, _ note: InboxNote) {
+    if let id = note.resultingItemId, let item = item(withId: id, in: store.context) { deleteItem(store, item) }
+    deleteInboxNote(store, note)
+}
+
 @MainActor
 public func markForResort(_ store: AppStore, _ note: InboxNote) {
     note.state = .pending

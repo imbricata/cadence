@@ -56,7 +56,7 @@ struct BacklogView: View {
     @ViewBuilder
     private func section(_ area: Area) -> some View {
         let all = areaItems(area)
-        let tasks = all.filter { $0.kind == .task && $0.status == .open }.sorted(by: Self.taskOrder)
+        let tasks = all.filter { $0.kind == .task && $0.status == .open }.sorted(by: taskOrder)
         let activities = all.filter { $0.kind == .activity }.sorted { $0.title < $1.title }
         let searching = !query.trimmingCharacters(in: .whitespaces).isEmpty
 
@@ -98,15 +98,6 @@ struct BacklogView: View {
                 collapsedRaw = set.sorted().joined(separator: ",")
             }
         )
-    }
-
-    static func taskOrder(_ a: Item, _ b: Item) -> Bool {
-        switch (a.dueDate, b.dueDate) {
-        case let (x?, y?): return x != y ? x < y : a.createdAt < b.createdAt
-        case (nil, nil): return a.createdAt < b.createdAt
-        case (nil, _): return false
-        case (_, nil): return true
-        }
     }
 
     // MARK: Actions

@@ -12,6 +12,8 @@ public struct AreaStat: Sendable {
     public var hasTarget: Bool
     public var daysObserved: Int
     public var targetWeeklyMinutes: Int?
+    /// Minutes logged (Full/Easy) in the current calendar week.
+    public var weekMinutes: Int = 0
 }
 
 public struct ActivityStat: Sendable {
@@ -100,6 +102,7 @@ public func computeInsights(context: ModelContext, events: [CalendarEvent], now:
     var areaStats: [AreaStat] = []
     let cal = Calendar.current
     let today = cal.startOfDay(for: now)
+    let thisWeek = cal.dateInterval(of: .weekOfYear, for: now)
     for area in areas where !area.isClassesCalendar && !area.isArchived {
         let cs = contributions.filter { $0.areaId == area.id }
         let raw = cs.reduce(0) { $0 + $1.minutes }
@@ -132,7 +135,8 @@ public func computeInsights(context: ModelContext, events: [CalendarEvent], now:
             isCalibrating: percent == nil,
             hasTarget: hasTarget,
             daysObserved: observed,
-            targetWeeklyMinutes: target?.weeklyMinutes
+            targetWeeklyMinutes: target?.weeklyMinutes,
+            weekMinutes: cs.filter { thisWeek?.contains($0.date) ?? false }.reduce(0) { $0 + $1.minutes }
         ))
     }
 

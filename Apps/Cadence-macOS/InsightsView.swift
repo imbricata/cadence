@@ -1,100 +1,156 @@
 import SwiftUI
 import SwiftData
+import Charts
 import CadenceCore
 
+/// One calm screen: follow-through, form per area, this week against targets, hours by activity.
 struct InsightsView: View {
     @Environment(InsightsModel.self) private var insights
     @Query(sort: \Area.sortOrder) private var areas: [Area]
     @Query private var items: [Item]
 
     private var snapshot: InsightSnapshot { insights.snapshot }
+    private var tracked: [Area] { areas.filter { !$0.isDeleted && !$0.isArchived && !$0.isClassesCalendar } }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                followThroughCard
-                formCard
-                activitiesCard
+            VStack(alignment: .leading, spacing: Theme.Space.xl) {
+                followThrough
+                form
+                targets
+                activities
             }
-            .padding(24)
-            .frame(maxWidth: 720, alignment: .leading)
+            .frame(maxWidth: 760, alignment: .leading)
+            .padding(Theme.Space.xl)
+            .frame(maxWidth: .infinity)
         }
         .navigationTitle("Insights")
     }
 
-    private var followThroughCard: some View {
-        let ft = snapshot.followThrough
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Follow-through").font(.headline)
-                Spacer()
-                if let p = ft.percent {
-                    Text("\(Int(p.rounded()))%")
-                        .font(.headline).monospacedDigit()
+    // MARK: Follow-through
+
+    private var followThrough: some View {
+        section("Follow-through") {
+            HStack(alignment: .firstTextBaseline, spacing: Theme.Space.s) {
+                if let p = snapshot.followThrough.percent {
+                    Text("\(Int(p.rounded()))%").font(.system(size: 44, weight: .semibold)).monospacedDigit()
                 } else {
-                    Text("—").foregroundStyle(.secondary)
+                    Text("—").font(.system(size: 44, weight: .semibold)).foregroundStyle(.secondary)
                 }
+                Text("of planned blocks, last 7 days").foregroundStyle(.secondary)
             }
-            Text("Last 7 days")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            FollowThroughChart(days: ft.days)
+            let weeks = snapshot.weeks.filter { $0.percent != nil }
+            if weeks.count >= 2 {
+                Chart(weeks, id: \.weekStart) { w in
+                    LineMark(x: .value("Week", w.weekStart, unit: .weekOfYear), y: .value("Follow-through", w.percent ?? 0))
+                        .interpolationMethod(.monotone)
+                        .foregroundStyle(Color.accentColor)
+                    PointMark(x: .value("Week", w.weekStart, unit: .weekOfYear), y: .value("Follow-through", w.percent ?? 0))
+                        .foregroundStyle(Color.accentColor)
+                }
+                .chartYScale(domain: 0...100)
+                .chartYAxis { AxisMarks(values: [0, 50, 100]) { AxisGridLine(); AxisValueLabel("\($0.as(Int.self) ?? 0)%") } }
+                .chartXAxis { AxisMarks(values: .stride(by: .weekOfYear)) { AxisValueLabel(format: .dateTime.day().month(.abbreviated)) } }
+                .frame(height: 120)
+            } else {
+                Text("The weekly trend appears after a couple of weeks.").font(.callout).foregroundStyle(.secondary)
+            }
         }
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.secondary.opacity(0.06)))
     }
 
-    private var formCard: some View {
-        let stats = snapshot.areas
-        return VStack(alignment: .leading, spacing: 12) {
-            Text("Form").font(.headline)
-            if stats.isEmpty {
+    // MARK: Form
+
+    private var form: some View {
+        section("Form") {
+            if snapshot.areas.isEmpty {
                 Text("Log some time to see form.").font(.callout).foregroundStyle(.secondary)
             }
-            ForEach(stats, id: \.areaId) { stat in
-                let name = areas.first { $0.id == stat.areaId }?.name ?? ""
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack {
-                        Text(name)
-                        Spacer()
-                        FormLabel(percent: stat.formPercent)
+            ForEach(snapshot.areas, id: \.areaId) { stat in
+                if let area = areas.first(where: { $0.id == stat.areaId }) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            AreaDot(colorHex: area.colorHex)
+                            Text(area.name)
+                            Spacer()
+                            PercentText(value: stat.formPercent).font(.callout)
+                        }
+                        FormBar(percent: stat.formPercent, colorHex: area.colorHex)
                     }
-                    FormBar(percent: stat.formPercent)
+                    .accessibilityElement(children: .combine)
+                }
+            }
+            Text("The tick is 100%: your normal level, or your target once you set one.")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+    }
+
+    // MARK: Targets
+
+    @ViewBuilder
+    private var targets: some View {
+        let withTarget = snapshot.areas.filter { $0.targetWeeklyMinutes != nil }
+        if !withTarget.isEmpty {
+            section("This week") {
+                ForEach(withTarget, id: \.areaId) { stat in
+                    if let area = areas.first(where: { $0.id == stat.areaId }), let target = stat.targetWeeklyMinutes {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                AreaDot(colorHex: area.colorHex)
+                                Text(area.name)
+                                Spacer()
+                                Text("\(stat.weekMinutes) / \(target) min").font(.callout).monospacedDigit().foregroundStyle(.secondary)
+                            }
+                            ProgressView(value: min(1, Double(stat.weekMinutes) / Double(max(1, target))))
+                                .tint(area.color.base)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
                 }
             }
         }
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.secondary.opacity(0.06)))
     }
 
-    private var activitiesCard: some View {
-        let stats = snapshot.activities.filter { $0.rawMinutes > 0 }
-        return VStack(alignment: .leading, spacing: 12) {
-            Text("Hours by activity").font(.headline)
+    // MARK: Hours
+
+    private var activities: some View {
+        section("Hours") {
+            let stats = snapshot.activities.filter { $0.rawMinutes > 0 }
             if stats.isEmpty {
                 Text("No logged hours yet.").font(.callout).foregroundStyle(.secondary)
             }
-            ForEach(stats.sorted { $0.rawMinutes > $1.rawMinutes }, id: \.itemId) { stat in
-                let title = items.first { $0.id == stat.itemId }?.title ?? ""
-                let areaId = items.first { $0.id == stat.itemId }?.areaId
-                HStack {
-                    if let area = areas.first(where: { $0.id == areaId }) {
-                        AreaDot(colorHex: area.colorHex)
+            ForEach(tracked) { area in
+                let rows = stats
+                    .compactMap { s in items.first(where: { $0.id == s.itemId && $0.areaId == area.id }).map { ($0, s) } }
+                    .sorted { $0.1.rawMinutes > $1.1.rawMinutes }
+                if !rows.isEmpty {
+                    VStack(alignment: .leading, spacing: Theme.Space.xs) {
+                        HStack(spacing: 6) { AreaDot(colorHex: area.colorHex, size: 8); Text(area.name).font(.subheadline.weight(.semibold)) }
+                        ForEach(rows, id: \.0.id) { item, s in
+                            HStack {
+                                Text(item.title)
+                                Spacer()
+                                Text(s.level > 0 ? "\(Format.hours(minutes: s.rawMinutes)) · Level \(s.level)" : Format.hours(minutes: s.rawMinutes))
+                                    .font(.callout).monospacedDigit().foregroundStyle(.secondary)
+                            }
+                            .padding(.leading, 14)
+                        }
                     }
-                    VStack(alignment: .leading) {
-                        Text(title)
-                        Text(levelLabel(hours: totalHours(minutes: stat.rawMinutes), levelIndex: stat.level))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Text(String(format: "%.1f h", totalHours(minutes: stat.rawMinutes)))
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
+                    .padding(.bottom, Theme.Space.xs)
                 }
             }
         }
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.secondary.opacity(0.06)))
+    }
+
+    // MARK: Layout
+
+    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Space.m) {
+            Text(title).font(.headline)
+            content()
+        }
+        .padding(Theme.Space.l)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous).fill(.quaternary.opacity(0.5)))
     }
 }

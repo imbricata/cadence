@@ -244,6 +244,26 @@ public final class GoogleService {
         }
     }
 
+    /// Removes an Area. Optionally deletes its Google calendar too (default is to keep it).
+    public func removeArea(_ area: Area, deleteCalendar: Bool) async {
+        let calendarId = area.googleCalendarId
+        deleteArea(store, area)
+        guard deleteCalendar, !calendarId.isEmpty, !area.isClassesCalendar, isAuthorized, !isDemo else { return }
+        do {
+            let token = try await auth.accessToken()
+            try await calendar.deleteCalendar(accessToken: token, calendarId: calendarId)
+        } catch {
+            classify(error)
+            message = UserMessage("The area was deleted, but its Google calendar couldn't be.")
+        }
+    }
+
+    /// Re-points an Area at another existing Google calendar.
+    public func linkArea(_ area: Area, to cal: GoogleCalendar) {
+        updateArea(store, area, calendarId: cal.id)
+        Task { await refreshVisible(force: true) }
+    }
+
     public func applyAreaAppearance(_ area: Area) async {
         guard isAuthorized, !isDemo, !area.googleCalendarId.isEmpty, !area.isClassesCalendar else { return }
         do {

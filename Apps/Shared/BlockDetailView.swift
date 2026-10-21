@@ -102,24 +102,15 @@ struct BlockDetailView: View {
                     ForEach(entries) { entry in
                         entryRow(entry)
                     }
-                    if !addableActivities.isEmpty || !addableTasks.isEmpty {
-                        addMenu
-                    }
+                    addControls
                 }
 
                 Section {
-                    Picker("Outcome", selection: stateBinding) {
-                        Text("Not yet").tag(BlockLogState.unlogged)
-                        Text("Full").tag(BlockLogState.full)
-                        Text("Easy").tag(BlockLogState.easy)
-                        Text("Skipped").tag(BlockLogState.skipped)
-                    }
-                    .pickerStyle(.segmented)
-                    .sensoryFeedback(.selection, trigger: state)
+                    OutcomePicker(selection: stateBinding)
 
                     if let log, entries.isEmpty, state == .full || state == .easy {
-                        Stepper(value: Binding(get: { log.loggedMinutes }, set: { setBlockMinutes(store, log, minutes: $0) }), in: 0...600, step: 5) {
-                            Text("\(log.loggedMinutes) min").monospacedDigit()
+                        LabeledContent("Time") {
+                            MinutesField(minutes: Binding(get: { log.loggedMinutes }, set: { setBlockMinutes(store, log, minutes: $0) }))
                         }
                     }
                     if state != .unlogged {
@@ -181,32 +172,42 @@ struct BlockDetailView: View {
                 Text(hint).font(.caption).foregroundStyle(.secondary)
             }
             if state != .unlogged, entry.outcome.countsAsWork {
-                Stepper(value: Binding(get: { entry.minutes }, set: { setEntryMinutes(store, entry, minutes: $0) }), in: 0...600, step: 5) {
-                    Text("\(entry.minutes) min").monospacedDigit().foregroundStyle(.secondary)
+                LabeledContent("Time") {
+                    MinutesField(minutes: Binding(get: { entry.minutes }, set: { setEntryMinutes(store, entry, minutes: $0) }))
                 }
+                .font(.callout)
+                .foregroundStyle(.secondary)
             }
         }
         .padding(.vertical, 2)
     }
 
-    private var addMenu: some View {
-        Menu {
-            if !addableActivities.isEmpty {
-                Section("Activities") {
+    @ViewBuilder
+    private var addControls: some View {
+        if !addableActivities.isEmpty {
+            VStack(alignment: .leading, spacing: Theme.Space.s) {
+                Text("Add an activity").font(.caption).foregroundStyle(.secondary)
+                ChipFlow {
                     ForEach(addableActivities) { item in
-                        Button(item.title) { planItem(store, item: item, in: ref) }
+                        AreaChip(title: item.title, colorHex: area.colorHex, isOn: false) { planItem(store, item: item, in: ref) }
                     }
                 }
             }
-            if !addableTasks.isEmpty {
-                Section("Tasks") {
-                    ForEach(addableTasks) { item in
-                        Button(item.title) { planItem(store, item: item, in: ref) }
+            .padding(.vertical, Theme.Space.xs)
+        }
+        ForEach(addableTasks) { item in
+            Button { planItem(store, item: item, in: ref) } label: {
+                HStack(spacing: Theme.Space.s) {
+                    Image(systemName: "plus.circle").foregroundStyle(Color.accentColor)
+                    Text(item.title)
+                    Spacer()
+                    if let due = item.dueDate {
+                        Text(due, format: .dateTime.day().month(.abbreviated)).font(.caption).monospacedDigit().foregroundStyle(.secondary)
                     }
                 }
+                .contentShape(Rectangle())
             }
-        } label: {
-            Label("Add item", systemImage: "plus")
+            .buttonStyle(.plain)
         }
     }
 

@@ -51,6 +51,14 @@ struct RootView: View {
         }
         .focusedSceneValue(\.rootActions, RootActions(newNote: { showQuickNote = true }))
         .toastHost()
+        #if DEBUG
+        .task {
+            if DemoMode.arg("CadenceSection") == "area" {
+                try? await Task.sleep(for: .milliseconds(500))
+                if let first = visibleAreas.first { selection = .area(first.id) }
+            }
+        }
+        #endif
     }
 
     // MARK: Sidebar

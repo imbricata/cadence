@@ -1,14 +1,20 @@
 import SwiftUI
+import SwiftData
 import CadenceCore
 
+/// Create or edit a task / activity. Autosave is not used here: Save commits, Cancel discards.
 struct ItemEditorView: View {
     @Environment(AppStore.self) private var store
+    @Environment(GoogleService.self) private var google
     @Environment(\.dismiss) private var dismiss
-    let areaId: UUID
+    @Query(sort: \Area.sortOrder) private var allAreas: [Area]
+
     let item: Item?
 
+    @State private var areaId: UUID
     @State private var title: String
     @State private var kind: ItemKind
+    @State private var status: ItemStatus
     @State private var hasDue: Bool
     @State private var dueDate: Date
     @State private var fullVersion: String
@@ -16,10 +22,11 @@ struct ItemEditorView: View {
     @State private var notes: String
 
     init(areaId: UUID, item: Item? = nil) {
-        self.areaId = areaId
         self.item = item
+        _areaId = State(initialValue: item?.areaId ?? areaId)
         _title = State(initialValue: item?.title ?? "")
         _kind = State(initialValue: item?.kind ?? .task)
+        _status = State(initialValue: item?.status ?? .open)
         _hasDue = State(initialValue: item?.dueDate != nil)
         _dueDate = State(initialValue: item?.dueDate ?? .now)
         _fullVersion = State(initialValue: item?.fullVersion ?? "")
@@ -27,9 +34,19 @@ struct ItemEditorView: View {
         _notes = State(initialValue: item?.notes ?? "")
     }
 
+    private var areas: [Area] { allAreas.filter { !$0.isDeleted && !$0.isArchived && !$0.isClassesCalendar } }
+
     var body: some View {
         NavigationStack {
             Form {
+                Section("Area") {
+                    ChipFlow {
+                        ForEach(areas) { area in
+                            AreaChip(title: area.name, colorHex: area.colorHex, isOn: area.id == areaId) { areaId = area.id }
+                        }
+                    }
+                    .padding(.vertical, Theme.Space.xs)
+                }
                 Section {
                     TextField("Title", text: $title)
                     Picker("Kind", selection: $kind) {
@@ -41,47 +58,75 @@ struct ItemEditorView: View {
                 if kind == .task {
                     Section {
                         Toggle("Due date", isOn: $hasDue)
-                        if hasDue {
-                            DatePicker("Due", selection: $dueDate, displayedComponents: .date)
+                        if hasDue { DatePicker("Due", selection: $dueDate, displayedComponents: .date) }
+                        if item != nil {
+                            Picker("Status", selection: $status) {
+                                Text("Open").tag(ItemStatus.open)
+                                Text("Done").tag(ItemStatus.done)
+                                Text("Dropped").tag(ItemStatus.dropped)
+                            }
                         }
                     }
                 }
-                Section("Versions") {
-                    TextField("Full version (optional)", text: $fullVersion)
-                    TextField("Easy version (optional)", text: $easyVersion)
+                Section {
+                    TextField("Full version", text: $fullVersion)
+                    TextField("Easy version", text: $easyVersion)
+                } header: {
+                    Text("Versions")
+                } footer: {
+                    Text("Optional. Shown when you log the item as Full or Easy.")
                 }
                 Section("Notes") {
-                    TextField("Notes (optional)", text: $notes, axis: .vertical)
+                    TextField("Notes", text: $notes, axis: .vertical)
+                }
+                if item != nil {
+                    Section {
+                        Button("Delete", role: .destructive, action: deleteItemAndDismiss)
+                    }
                 }
             }
+            .formStyle(.grouped)
             .navigationTitle(item == nil ? "New Item" : "Edit Item")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save() }.disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
+                    Button("Save", action: save).disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
         }
+        #if os(macOS)
+        .frame(minWidth: 440, minHeight: 540)
+        #else
+        .presentationDetents([.medium, .large])
+        #endif
     }
 
     private func save() {
         let t = title.trimmingCharacters(in: .whitespaces)
         let due: Date? = (kind == .task && hasDue) ? Calendar.current.startOfDay(for: dueDate) : nil
+        func opt(_ s: String) -> String? { s.trimmingCharacters(in: .whitespaces).isEmpty ? nil : s }
         if let item {
-            updateItem(store, item,
-                       title: t, kind: kind,
-                       dueDate: due as Date?,
-                       fullVersion: fullVersion.isEmpty ? nil : fullVersion,
-                       easyVersion: easyVersion.isEmpty ? nil : easyVersion,
-                       notes: notes.isEmpty ? nil : notes)
+            updateItem(store, item, title: t, kind: kind, areaId: areaId, dueDate: due as Date?,
+                       fullVersion: opt(fullVersion), easyVersion: opt(easyVersion), notes: opt(notes),
+                       status: kind == .task ? status : .open)
         } else {
             let it = createItem(store, kind: kind, title: t, areaId: areaId, dueDate: due)
-            if !fullVersion.isEmpty || !easyVersion.isEmpty || !notes.isEmpty {
-                updateItem(store, it,
-                           fullVersion: fullVersion.isEmpty ? nil : fullVersion,
-                           easyVersion: easyVersion.isEmpty ? nil : easyVersion,
-                           notes: notes.isEmpty ? nil : notes)
-            }
+            updateItem(store, it, fullVersion: opt(fullVersion), easyVersion: opt(easyVersion), notes: opt(notes))
+        }
+        dismiss()
+    }
+
+    private func deleteItemAndDismiss() {
+        guard let item else { return }
+        let name = item.title
+        deleteItem(store, item)
+        google.message = UserMessage("Deleted “\(name)”", actionTitle: "Undo") {
+            item.isDeleted = false
+            item.updatedAt = .now
+            store.save()
         }
         dismiss()
     }

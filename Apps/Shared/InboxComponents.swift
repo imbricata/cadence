@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import CadenceCore
 
+/// One note in the Inbox: sorting, failed, or a compact item card. The raw text is never shown.
 struct InboxNoteRow: View {
     @Environment(AppStore.self) private var store
     @Environment(InboxService.self) private var inbox
@@ -9,67 +10,83 @@ struct InboxNoteRow: View {
     let note: InboxNote
     let item: Item?
     let area: Area?
+    var onEdit: (Item) -> Void
 
-    @State private var showEditor = false
     @State private var showManual = false
 
     var body: some View {
-        switch note.state {
-        case .pending:
-            HStack(spacing: 8) {
-                ProgressView().controlSize(.small)
-                Text("Sorting…")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+        Group {
+            switch note.state {
+            case .pending: pending
+            case .failed: failed
+            case .sorted: sorted
             }
-            .padding(.vertical, 6)
-        case .failed:
-            HStack {
-                Image(systemName: "questionmark.circle").foregroundStyle(.secondary)
-                Text("Couldn't sort automatically")
-                    .font(.subheadline)
-                Spacer()
-                Button("Sort manually") { showManual = true }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-            }
-            .padding(.vertical, 4)
-            .contextMenu {
-                Button("Re-sort") { Task { await inbox.resort(note) } }
-                Button("Delete", role: .destructive) { deleteInboxNote(store, note) }
-            }
-            .sheet(isPresented: $showManual) { ManualSortSheet(note: note) }
-        case .sorted:
-            Button { showEditor = true } label: {
-                HStack(spacing: 10) {
+        }
+        .padding(.horizontal, Theme.Space.m)
+        .padding(.vertical, Theme.Space.s + 2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contextMenu {
+            if let item { Button("Edit…") { onEdit(item) } }
+            if note.state != .pending { Button("Sort Again") { Task { await inbox.resort(note) } } }
+            Button("Delete", role: .destructive) { deleteInboxCard(store, note) }
+        }
+        .sheet(isPresented: $showManual) { ManualSortSheet(note: note) }
+    }
+
+    private var pending: some View {
+        HStack(spacing: Theme.Space.s) {
+            ProgressView().controlSize(.small)
+            Text("Sorting…").font(.subheadline).foregroundStyle(.secondary)
+        }
+    }
+
+    private var failed: some View {
+        HStack {
+            Image(systemName: "exclamationmark.circle").foregroundStyle(.secondary)
+            Text("Couldn't sort this note").font(.subheadline)
+            Spacer()
+            Button("Sort") { showManual = true }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+        }
+    }
+
+    @ViewBuilder
+    private var sorted: some View {
+        if let item {
+            Button { onEdit(item) } label: {
+                HStack(spacing: Theme.Space.m) {
                     AreaDot(colorHex: area?.colorHex ?? "#888C96", size: 10)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(item?.title ?? "")
-                            .font(.subheadline)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.title).font(.body).lineLimit(2).multilineTextAlignment(.leading)
                         HStack(spacing: 6) {
-                            Text(item?.kind == .activity ? "Activity" : "Task")
-                                .font(.caption2).foregroundStyle(.secondary)
-                            if let due = item?.dueDate {
-                                Text(due, format: .dateTime.month(.abbreviated).day())
-                                    .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                            Text(subtitle(item)).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                            if note.isLowConfidence {
+                                Image(systemName: "questionmark.circle")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                                    .accessibilityLabel("Low confidence. Check the area.")
+                                    .help("Not sure about this one. Check the area.")
                             }
                         }
                     }
-                    Spacer()
+                    Spacer(minLength: 0)
                 }
-                .padding(.vertical, 6)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .contextMenu {
-                Button("Edit") { showEditor = true }
-                Button("Re-sort") { Task { await inbox.resort(note) } }
-                Button("Delete", role: .destructive) { deleteInboxNote(store, note) }
-            }
-            .sheet(isPresented: $showEditor) {
-                if let item {
-                    ItemEditorView(areaId: item.areaId, item: item)
-                }
-            }
+        } else {
+            Text("Removed").font(.subheadline).foregroundStyle(.tertiary)
+        }
+    }
+
+    private func subtitle(_ item: Item) -> String {
+        let name = area?.name ?? ""
+        switch item.kind {
+        case .activity: return "\(name) · Activity"
+        case .task:
+            if let due = item.dueDate { return "\(name) · Task · Due \(due.formatted(.dateTime.day().month(.abbreviated)))" }
+            return "\(name) · Task"
         }
     }
 }
@@ -92,18 +109,28 @@ struct ManualSortSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Picker("Area", selection: $areaId) {
-                    Text("Choose…").tag(UUID?.none)
-                    ForEach(selectable) { Text($0.name).tag(Optional($0.id)) }
+                Section("Area") {
+                    ChipFlow {
+                        ForEach(selectable) { a in
+                            AreaChip(title: a.name, colorHex: a.colorHex, isOn: areaId == a.id) { areaId = a.id }
+                        }
+                    }
+                    .padding(.vertical, Theme.Space.xs)
                 }
-                Picker("Kind", selection: $kind) {
-                    Text("Task").tag(ItemKind.task)
-                    Text("Activity").tag(ItemKind.activity)
+                Section {
+                    TextField("Title", text: $title)
+                    Picker("Kind", selection: $kind) {
+                        Text("Task").tag(ItemKind.task)
+                        Text("Activity").tag(ItemKind.activity)
+                    }
+                    .pickerStyle(.segmented)
                 }
-                .pickerStyle(.segmented)
-                TextField("Title", text: $title)
             }
-            .navigationTitle("Sort manually")
+            .formStyle(.grouped)
+            .navigationTitle("Sort note")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
@@ -111,8 +138,16 @@ struct ManualSortSheet: View {
                         .disabled(areaId == nil || title.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
-            .onAppear { if areaId == nil { areaId = selectable.first?.id } }
+            .onAppear {
+                if areaId == nil { areaId = selectable.first?.id }
+                if title.isEmpty { title = note.rawText }
+            }
         }
+        #if os(macOS)
+        .frame(minWidth: 420, minHeight: 340)
+        #else
+        .presentationDetents([.medium])
+        #endif
     }
 
     private func save() {

@@ -97,6 +97,10 @@ public struct GoogleCalendarAPI: Sendable {
         _ = try await request("/calendars/\(Self.pathEscape(calendarId))", token: accessToken, method: "PATCH", body: try encode(body))
     }
 
+    public func deleteCalendar(accessToken: String, calendarId: String) async throws {
+        _ = try await request("/calendars/\(Self.pathEscape(calendarId))", token: accessToken, method: "DELETE")
+    }
+
     public func setCalendarColor(accessToken: String, calendarId: String, hex: String) async throws {
         let fg = "000000"
         let body: [String: String] = [
