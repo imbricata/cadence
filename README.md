@@ -1,48 +1,41 @@
 # Cadence
 
-A personal system for planning days around areas of life, filling time blocks with tasks and activities, and seeing honest, minimal scores of what actually happens. Single user, native macOS + iOS, installed from Xcode with a free Apple ID (not for the App Store).
+A personal system for planning days around the areas of your life, filling time blocks with tasks and activities, and seeing honest, minimal scores of what actually happens. Single user, native macOS + iOS, installed from Xcode with a free Apple ID (not for the App Store).
 
 ## What it does
 
-- **Areas** — user-defined parts of life (name, color, icon), each mapped 1:1 to a Google calendar. A read-only **Classes** area links your college calendar.
-- **Blocks** — Google Calendar events in an Area's calendar. Plan them on the Mac (week grid + backlog); open one on either device to fill it with that Area's activities/tasks and log **Full / Easy / Skipped** (plus unplanned time).
-- **Inbox** — chat-style note capture; each note is sorted into an Item by OpenRouter (structured JSON output), with offline queueing, retries, and a soft monthly cost cap.
-- **Scores** — hours per activity/area, per-area Form (recent vs baseline/target), overall Follow-through, and quiet milestone Levels. Target proposals appear after 21 days. No streaks, badges, or notifications.
-- **Sync** — Google Drive `appDataFolder` (hidden app-private storage), one JSON file per model type, newest-`updatedAt`-wins merged with tombstones. Local SwiftData is always the source of truth for the UI.
-
-## Platforms
-
-- iOS 26 and macOS 26. Swift + SwiftUI + SwiftData + Observation.
-- iOS widgets: a **Capture** widget that deep-links into the Inbox composer.
+- **Areas**: parts of your life (name, color, symbol), each tied to a Google calendar. A read-only **Classes** calendar (Google calendar or a plain `.ics` link) shows your timetable.
+- **Plan** (Mac): a day/week calendar. Drag in empty space to make a block, drag blocks to move or resize them, drop backlog items onto blocks. **Today** (iPhone): the same day as a timeline with a week strip.
+- **Planning vs logging**: choosing items for a block is just a plan and never changes your scores. Logging a block **Full / Easy / Skipped** is a separate, explicit step.
+- **Inbox**: chat-style notes, each sorted into a task or activity by OpenRouter (structured output, offline queue, retries, monthly cost cap).
+- **Scores**: hours and levels per activity, Form per area (recent vs. your normal or your target), and follow-through over recent weeks. No streaks, badges or notifications.
+- **Sync**: Google Drive `appDataFolder`, one JSON file per model type, newest-`updatedAt`-wins with tombstones. Local SwiftData is always the source of truth.
 
 ## Code layout
 
 ```
-Cadence/
-  project.yml                 # XcodeGen project definition (never edit .pbxproj)
-  Secrets.example.xcconfig    # copy to Secrets.xcconfig (git-ignored)
-  Packages/CadenceCore/       # shared Swift package
-    Models/                   #   SwiftData models + enums
-    Google/                   #   OAuth (PKCE), Calendar REST, Drive appDataFolder sync
-    AI/                       #   OpenRouter client, inbox sorter, cost tracking
-    Scoring/                  #   pure scoring functions (unit-tested)
-    Store/                    #   repositories, queries, mutations, insights, export
-  Apps/Cadence-iOS/           # iPhone app (TabView)
-  Apps/Cadence-macOS/         # Mac app (NavigationSplitView)
-  Apps/CadenceWidgets/        # Capture widget extension
-  Apps/Shared/                # views shared by both apps
-  Tests/                      # unit tests (scoring math)
+project.yml                  XcodeGen project (never edit the .pbxproj)
+Packages/CadenceCore/        shared Swift package
+  Models/                    SwiftData models + enums
+  Calendar/                  EventStore (per-calendar cache), EventSource, EventLayout (pure geometry)
+  Google/                    OAuth (PKCE), Calendar REST, Drive sync, ICS parser, GoogleService
+  AI/                        OpenRouter client, inbox sorter, cost tracking
+  Scoring/                   pure scoring functions
+  Store/                     queries, mutations, block logging rules, InsightsModel
+Apps/Shared/                 views used by both apps (+ Design/: theme, colors, components; Demo/: DEBUG fixtures)
+Apps/Cadence-iOS/           iPhone app (Today timeline, Inbox, Areas)
+Apps/Cadence-macOS/         Mac app (Plan canvas, backlog inspector, Inbox, Insights, Settings)
+Tests/                       unit tests (scoring, logging rules, sync merge, ICS, event store, layout)
+scripts/                     screenshot helpers for demo mode
 ```
-
-Shared logic lives in `CadenceCore`; each platform has native layouts built from the shared components in `Apps/Shared`.
 
 ## Build / test
 
 ```
 xcodegen generate
-xcodebuild -project Cadence.xcodeproj -scheme CadenceiOS -destination 'generic/platform=iOS Simulator' build
 xcodebuild -project Cadence.xcodeproj -scheme CadenceMac build
+xcodebuild -project Cadence.xcodeproj -scheme CadenceiOS -destination 'generic/platform=iOS Simulator' build
 xcodebuild -project Cadence.xcodeproj -scheme CadenceCoreTests test
 ```
 
-See `SETUP.md` for the full by-hand setup (Google Cloud, signing, secrets, weekly reinstall). See `DECISIONS.md` for every judgment call made during the build.
+`SETUP.md` has the by-hand setup (Google Cloud, signing, secrets, weekly reinstall). `TESTING.md` is the short manual check that needs real accounts. `DECISIONS.md` logs every judgment call. `PLAN.md` is the plan the overhaul followed.

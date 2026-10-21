@@ -65,11 +65,11 @@ struct PlanView: View {
         .navigationSubtitle(subtitle)
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
-                Button { shift(-1) } label: { Image(systemName: "chevron.left") }
+                Button { shift(-1) } label: { Label("Previous", systemImage: "chevron.left").labelStyle(.iconOnly) }
                     .help("Previous (⌘←)")
                 Button("Today") { goToday() }
                     .help("Go to today (⌘T)")
-                Button { shift(1) } label: { Image(systemName: "chevron.right") }
+                Button { shift(1) } label: { Label("Next", systemImage: "chevron.right").labelStyle(.iconOnly) }
                     .help("Next (⌘→)")
             }
             ToolbarItem(placement: .principal) {

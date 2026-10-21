@@ -41,28 +41,32 @@ Do these steps by hand, in order. Anything you skip will show up as "not connect
 ## 5. Signing (free Personal Team)
 
 12. For the **CadenceiOS** target: Signing & Capabilities → check "Automatically manage signing", select your **Personal Team**.
-13. Do the same for **CadenceWidgets** (the widget extension).
-14. For the **CadenceMac** target, select your Personal Team.
-15. Keep the bundle identifiers as-is (`com.theocoronges.cadence`, `com.theocoronges.cadence.widgets`, `com.theocoronges.cadence.mac`). They must match the Google OAuth clients, and a free Personal Team can only register a few App IDs per week, so don't change them. If Xcode says an ID is taken, change the prefix once everywhere (project.yml + the Google clients) and run `xcodegen generate` again.
+13. For the **CadenceMac** target, select your Personal Team.
+14. Keep the bundle identifiers as-is (`com.theocoronges.cadence` and `com.theocoronges.cadence.mac`). They must match the Google OAuth clients, and a free Personal Team can only register a few App IDs per week, so don't change them. If Xcode says an ID is taken, change the prefix once everywhere (project.yml + the Google clients) and run `xcodegen generate` again.
 
 ## 6. Run
 
-16. Build & run the **CadenceiOS** scheme on your iPhone (plug in, select it as the destination).
-17. Build & run the **CadenceMac** scheme on your Mac.
+15. Build & run the **CadenceiOS** scheme on your iPhone (plug in, select it as the destination).
+16. Build & run the **CadenceMac** scheme on your Mac (destination "My Mac").
 
-## 7. First launch / on-boarding
+## 7. First launch
 
-18. In the app, open **Settings** → tap **Connect Google Calendar** and approve the scopes.
-19. Still in Settings, pick your college calendar as the **Classes calendar**.
-20. Open **Areas** → **+** to create your areas. Each new area creates its own Google calendar named after it. Renaming or recoloring an area also updates that calendar. (Linking an *existing* calendar to an area is not built yet.)
-21. Open **Settings** → enter your **OpenRouter** API key (from https://openrouter.ai/keys) and optionally set the model + monthly cap.
+The first time you open either app, a short welcome appears. Every step has **Skip for now**.
+
+17. **Connect Google** and approve the scopes. Use the same Google account on both devices.
+18. **On your second device** this is all you do: Cadence restores your Areas, items and logs from Google Drive and says "Welcome back".
+19. **On the first device**, set up **Classes**: either paste your university's calendar link (the `.ics` URL, e.g. from Blackboard; tap *Check link* to see how many events it finds) or pick a Google calendar. The link refreshes by itself.
+20. Add your first **Areas**. Each one gets its own Google calendar named after it, or you can link a calendar you already have. You can change all of this later (Settings, or an Area's edit screen).
+21. Open **Settings** (gear on iPhone, ⌘, on Mac) → **AI Sorting**, paste your **OpenRouter** key and tap Save Key. Notes you send to the Inbox are sorted with it. Without a key, notes simply wait.
 
 ## 8. Keeping it running
 
-22. iPhone apps installed with a free account **expire after 7 days**. Reinstall from Xcode weekly. Your data survives (same bundle id keeps the local store) and is additionally synced to Google Drive's `appDataFolder`, so re-signing in restores everything.
-23. If a device signs itself out, just tap **Reconnect Google** — no local data is lost.
+22. iPhone apps installed with a free account **expire after 7 days**. Reinstall from Xcode weekly. Your data survives (same bundle id keeps the local store) and is also synced to Google Drive's `appDataFolder`, so signing in again restores everything.
+23. If Google signs you out, a "Google disconnected. Reconnect" bar appears. Tap Reconnect; no local data is lost.
+24. **Update both devices together** after pulling a new version: older builds can't read newer sync files, and Cadence refuses to overwrite a sync file it can't read.
 
 ## Notes
 
-- The OpenRouter key is entered at runtime (Settings) and stored in the Keychain. It is never in the repo.
-- If you ever re-add or rename files/targets, run `xcodegen generate` again — never hand-edit the `.pbxproj`.
+- The OpenRouter key is entered at runtime and stored in the Keychain. It is never in the repo.
+- If you add or rename files/targets, run `xcodegen generate` again; never hand-edit the `.pbxproj`.
+- Debug builds understand `-CadenceDemo YES`, which runs the app on fake data (no Google, no Keychain). It's what the screenshots in `scripts/` use.
