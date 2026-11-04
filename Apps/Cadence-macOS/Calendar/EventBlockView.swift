@@ -28,8 +28,6 @@ struct EventBlockView: View {
     private var isClasses: Bool { area?.isClassesCalendar ?? true }
     private var state: BlockLogState { info?.state ?? .unlogged }
     private var isPastUnlogged: Bool { !isClasses && event.end < .now && state == .unlogged }
-    /// A later overlapping block sits on top of this one's right side: show only the title.
-    private var covered: Bool { positioned.laneCount > 1 && positioned.lane < positioned.laneCount - 1 }
     private var compact: Bool { size.height < 40 }
 
     var body: some View {
@@ -57,6 +55,7 @@ struct EventBlockView: View {
             if isEditable { resizeHandles }
         }
         .frame(width: size.width, height: size.height)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.block, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: Theme.Radius.block, style: .continuous)
                 .strokeBorder(
@@ -92,12 +91,11 @@ struct EventBlockView: View {
         let end = previewRange?.end ?? event.end
         // Narrow columns only have room for the start time.
         let range = size.width < 112 ? start.formatted(date: .omitted, time: .shortened) : Format.timeRange(start, end)
-        if covered {
-            Text(title).font(.callout.weight(.semibold)).lineLimit(1)
-        } else if compact {
+        if compact {
             HStack(spacing: 5) {
-                Text(title).font(.callout.weight(.semibold)).lineLimit(1)
-                Text(range).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                Text(title).font(.callout.weight(.semibold)).lineLimit(1).layoutPriority(1)
+                Text(start, format: .dateTime.hour().minute())
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1).monospacedDigit()
             }
         } else {
             VStack(alignment: .leading, spacing: 1) {

@@ -9,6 +9,13 @@ enum DemoMode {
     static var isEnabled: Bool { UserDefaults.standard.bool(forKey: "CadenceDemo") }
     /// Other DEBUG launch arguments, e.g. `-CadenceTab inbox`, `-CadenceSection plan`.
     static func arg(_ name: String) -> String? { UserDefaults.standard.string(forKey: name) }
+    static var colorScheme: ColorScheme? {
+        switch arg("CadenceAppearance") {
+        case "light": return .light
+        case "dark": return .dark
+        default: return nil
+        }
+    }
 
     struct Spec { let key: String; let name: String; let hex: String; let symbol: String }
     static let specs: [Spec] = [
@@ -75,7 +82,7 @@ enum DemoMode {
         let store = try! AppStore.inMemory()
         seed(store)
         let google = GoogleService(store: store, eventSource: DemoEventSource(), isDemo: true)
-        let inbox = InboxService(store: store)
+        let inbox = InboxService(store: store, keyProvider: { nil })
         return AppServices(store: store, google: google, inbox: inbox, insights: InsightsModel(store: store, events: google.eventStore))
     }
 
@@ -113,6 +120,7 @@ enum DemoMode {
 
         _ = task("work", "Finish quarterly report", due: 2)
         _ = task("work", "Reply to recruiter", due: -1)
+        _ = task("home", "Book dentist appointment", due: 0)
         _ = task("work", "Book flights")
         _ = task("spanish", "Write essay draft", due: 3)
         _ = task("spanish", "Order textbook")

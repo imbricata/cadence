@@ -111,7 +111,9 @@ public final class GoogleAuth {
             let session = ASWebAuthenticationSession(
                 url: url,
                 callback: .customScheme(GoogleAuthConfig.callbackScheme)
-            ) { callbackURL, error in
+            ) { @Sendable callbackURL, error in
+                // Called by AuthenticationServices on an arbitrary XPC queue, so this
+                // closure must NOT inherit this class's @MainActor isolation.
                 if let error {
                     if (error as? ASWebAuthenticationSessionError)?.code == .canceledLogin {
                         continuation.resume(throwing: GoogleAuthError.cancelled)

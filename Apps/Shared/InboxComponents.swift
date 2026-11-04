@@ -27,17 +27,35 @@ struct InboxNoteRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .contextMenu {
             if let item { Button("Edit…") { onEdit(item) } }
-            if note.state != .pending { Button("Sort Again") { Task { await inbox.resort(note) } } }
-            Button("Delete", role: .destructive) { deleteInboxCard(store, note) }
+            if note.state != .sorted { Button("Sort Manually…") { showManual = true } }
+            if !note.rawText.isEmpty && note.id != inbox.processingNoteId {
+                Button("Sort Again") { Task { await inbox.resort(note) } }
+            }
+            Button("Remove Note", role: .destructive) { deleteInboxCard(store, note) }
         }
         .sheet(isPresented: $showManual) { ManualSortSheet(note: note) }
     }
 
     private var pending: some View {
         HStack(spacing: Theme.Space.s) {
-            ProgressView().controlSize(.small)
-            Text("Sorting…").font(.subheadline).foregroundStyle(.secondary)
+            if inbox.processingNoteId == note.id {
+                ProgressView().controlSize(.small)
+                Text("Sorting…").font(.subheadline).foregroundStyle(.secondary)
+            } else {
+                Image(systemName: "tray").foregroundStyle(.secondary)
+                Text(pendingLabel).font(.subheadline).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button("Sort Manually") { showManual = true }
+                .buttonStyle(.bordered).controlSize(.small)
         }
+    }
+
+    private var pendingLabel: String {
+        if !inbox.hasKey { return "Saved · AI not connected" }
+        if inbox.isOverCap { return "Saved · sorting limit reached" }
+        if note.failureCount > 0 { return "Saved · waiting to retry" }
+        return "Saved · waiting to sort"
     }
 
     private var failed: some View {
@@ -45,7 +63,7 @@ struct InboxNoteRow: View {
             Image(systemName: "exclamationmark.circle").foregroundStyle(.secondary)
             Text("Couldn't sort this note").font(.subheadline)
             Spacer()
-            Button("Sort") { showManual = true }
+            Button("Sort Manually") { showManual = true }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
         }
@@ -101,6 +119,8 @@ struct ManualSortSheet: View {
     @State private var areaId: UUID?
     @State private var kind: ItemKind = .task
     @State private var title: String = ""
+    @State private var hasDue = false
+    @State private var dueDate = Date.now
 
     private var selectable: [Area] {
         areas.filter { !$0.isDeleted && !$0.isArchived && !$0.isClassesCalendar }
@@ -116,6 +136,7 @@ struct ManualSortSheet: View {
                         }
                     }
                     .padding(.vertical, Theme.Space.xs)
+                    if selectable.isEmpty { Text("Add an area first in Areas or Settings.").foregroundStyle(.secondary) }
                 }
                 Section {
                     TextField("Title", text: $title)
@@ -124,6 +145,10 @@ struct ManualSortSheet: View {
                         Text("Activity").tag(ItemKind.activity)
                     }
                     .pickerStyle(.segmented)
+                    if kind == .task {
+                        Toggle("Due date", isOn: $hasDue)
+                        if hasDue { DatePicker("Due", selection: $dueDate, displayedComponents: .date) }
+                    }
                 }
             }
             .formStyle(.grouped)
@@ -135,7 +160,7 @@ struct ManualSortSheet: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { save() }
-                        .disabled(areaId == nil || title.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .disabled(!selectable.contains { $0.id == areaId } || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || note.isDeleted)
                 }
             }
             .onAppear {
@@ -146,14 +171,27 @@ struct ManualSortSheet: View {
         #if os(macOS)
         .frame(minWidth: 420, minHeight: 340)
         #else
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
         #endif
     }
 
     private func save() {
-        guard let areaId else { return }
-        let item = createItem(store, kind: kind, title: title.trimmingCharacters(in: .whitespaces), areaId: areaId)
-        completeManually(store, note, itemId: item.id)
+        let text = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !note.isDeleted, !text.isEmpty, let areaId, selectable.contains(where: { $0.id == areaId }) else { return }
+        let due: Date? = kind == .task && hasDue ? Calendar.current.startOfDay(for: dueDate) : nil
+        // AI may have finished while the editor was open. Update its result instead of duplicating it.
+        if let id = note.resultingItemId, let existing = item(withId: id, in: store.context),
+           !existing.isDeleted, existing.kind == .task {
+            updateItem(store, existing, title: text, kind: kind, areaId: areaId, dueDate: .some(due))
+            completeManually(store, note, itemId: existing.id)
+        } else if kind == .activity, let existing = activities(forArea: areaId, in: store.context).first(where: {
+            $0.title.localizedCaseInsensitiveCompare(text) == .orderedSame
+        }) {
+            completeManually(store, note, itemId: existing.id)
+        } else {
+            let item = createItem(store, kind: kind, title: text, areaId: areaId, dueDate: due)
+            completeManually(store, note, itemId: item.id)
+        }
         dismiss()
     }
 }

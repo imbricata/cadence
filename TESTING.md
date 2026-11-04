@@ -1,6 +1,6 @@
 # Manual test (needs your real accounts)
 
-Everything else is covered by unit tests and demo-mode screenshots. Run this after installing both apps, ten minutes in total.
+Core behavior is checked with unit tests and the UI is reviewed using demo-mode screenshots. These checks cover real-account behavior after installing both apps.
 
 ## Setup
 1. Install on iPhone and Mac (see `SETUP.md`). Both on the same Google account.
@@ -22,3 +22,14 @@ Everything else is covered by unit tests and demo-mode screenshots. Run this aft
 11. Delete a block on the iPhone (long-press): it disappears on the Mac after sync. Tap **Undo** right after deleting: it comes back.
 12. Turn on Airplane mode: the offline bar appears and your cached day still shows. Turn it off: it clears by itself.
 13. Add your OpenRouter key and send a note in the Inbox: it becomes a card in a few seconds. A low-confidence one has a small question mark.
+
+## Daily tasks and capture
+14. In **Tasks**, create a task due today and another due tomorrow. Verify their sections and the Today screen's attention link. Search by title or Area, then clear the search.
+15. Complete a task, tap Undo, then complete it again. Check **Done** and reopen it. Confirm the change arrives on the other device after sync.
+16. Use **Sort Manually** on a queued note, set its Area/title/due date, and confirm it appears in Tasks. Remove the Inbox note: the task should remain.
+17. Delete an item from its editor, quit and relaunch: it should stay deleted. Update both apps before checking deletion sync.
+
+## Screenshot review
+- DEBUG fixtures: `-CadenceDemo YES`, `-CadenceTab today|tasks|inbox|areas` on iPhone, `-CadenceSection plan|tasks|inbox|insights|area` on Mac.
+- `-CadenceAppearance light|dark` overrides only the demo app's appearance. Check Tasks, Today/Plan and Inbox in both modes and iPhone XXL text; verify no clipped task titles or cramped date captions.
+- `-CadenceTaskFilter due|done` and `-CadenceSheet task` open the task filters/editor for inspection.

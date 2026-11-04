@@ -67,6 +67,29 @@ final class ICSTests: XCTestCase {
         XCTAssertTrue(ev[0].isAllDayLike)
     }
 
+    func testBlackboardOneSecondDeadlineIsDeadline() {
+        // Blackboard exports some deadlines as start + 1 second; they must not become grid blocks.
+        let ics = wrap("BEGIN:VEVENT\r\nUID:bb\r\nDTSTART:20261020T160000Z\r\nDTEND:20261020T160001Z\r\nSUMMARY:Deadline of Read document\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:cls\r\nDTSTART:20261020T160000Z\r\nDTEND:20261020T172000Z\r\nSUMMARY:Class\r\nEND:VEVENT\r\n")
+        let day = date(2026, 10, 20, tz: utc)
+        let c = cal(utc)
+        let ev = ICSParser.parse(ics, calendarId: "c", range: range(day, date(2026, 10, 21, tz: utc)), calendar: c)
+        XCTAssertEqual(ev.count, 2)
+        XCTAssertEqual(EventLayout.layout(ev, on: day, calendar: c).map(\.event.summary), ["Class"])
+        XCTAssertEqual(EventLayout.allDayItems(ev, on: day, calendar: c).map(\.summary), ["Deadline of Read document"])
+        XCTAssertEqual(EventLayout.layout(ev, on: day, calendar: c).first?.laneCount, 1)
+    }
+
+    func testWholeDayTimedEventGoesToAllDayStrip() {
+        let ics = wrap("BEGIN:VEVENT\r\nUID:async\r\nDTSTART:20261020T000000Z\r\nDTEND:20261020T235900Z\r\nSUMMARY:Asynchronous\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:cls\r\nDTSTART:20261020T150000Z\r\nDTEND:20261020T162000Z\r\nSUMMARY:Class\r\nEND:VEVENT\r\n")
+        let day = date(2026, 10, 20, tz: utc)
+        let c = cal(utc)
+        let ev = ICSParser.parse(ics, calendarId: "c", range: range(day, date(2026, 10, 21, tz: utc)), calendar: c)
+        XCTAssertEqual(EventLayout.allDayItems(ev, on: day, calendar: c).map(\.summary), ["Asynchronous"])
+        let placed = EventLayout.layout(ev, on: day, calendar: c)
+        XCTAssertEqual(placed.map(\.event.summary), ["Class"])
+        XCTAssertEqual(placed.first?.laneCount, 1)
+    }
+
     func testAllDayEvent() {
         let ics = wrap("BEGIN:VEVENT\r\nUID:ad\r\nDTSTART;VALUE=DATE:20261024\r\nDTEND;VALUE=DATE:20261026\r\nSUMMARY:Trip\r\nEND:VEVENT\r\n")
         let r = range(date(2026, 10, 24, tz: utc), date(2026, 10, 27, tz: utc))

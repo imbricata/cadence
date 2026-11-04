@@ -5,7 +5,12 @@ import SwiftData
 public final class Target: SyncedModel {
     public var id: UUID
     public var updatedAt: Date
-    public var isDeleted: Bool
+    @Attribute(originalName: "isDeleted") public var isTombstoned: Bool = false
+    // A stored `isDeleted` collides with Core Data's deletion flag. Preserve the sync-facing API.
+    public var isDeleted: Bool {
+        get { isTombstoned }
+        set { isTombstoned = newValue }
+    }
 
     public var areaId: UUID
     public var weeklyMinutes: Int?
@@ -23,7 +28,7 @@ public final class Target: SyncedModel {
     ) {
         self.id = id
         self.updatedAt = updatedAt
-        self.isDeleted = isDeleted
+        self.isTombstoned = isDeleted
         self.areaId = areaId
         self.weeklyMinutes = weeklyMinutes
         self.weeklySessions = weeklySessions

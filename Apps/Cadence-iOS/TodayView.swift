@@ -19,6 +19,7 @@ struct TodayView: View {
     @State private var readOnly: CalendarEvent?
     @State private var createSlot: CreateSlot?
     @State private var showUnplanned = false
+    @State private var showNewTask = false
     @State private var deleteCandidate: CalendarEvent?
 
     private var cal: Calendar { .current }
@@ -73,6 +74,8 @@ struct TodayView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
+                        Button { showNewTask = true } label: { Label("New Task", systemImage: "checklist") }
+                            .disabled(!areas.contains { !$0.isDeleted && !$0.isArchived && !$0.isClassesCalendar })
                         Button { newBlockAtNextFreeSlot() } label: { Label("New Block", systemImage: "plus") }
                         Button { showUnplanned = true } label: { Label("Log Time", systemImage: "clock.badge.plus") }
                     } label: {
@@ -98,6 +101,7 @@ struct TodayView: View {
         }
         .sheet(item: $createSlot) { QuickCreateSheet(slot: $0) }
         .sheet(isPresented: $showUnplanned) { UnplannedLogSheet() }
+        .sheet(isPresented: $showNewTask) { ItemEditorView() }
         .confirmationDialog(
             "Delete this block?",
             isPresented: Binding(get: { deleteCandidate != nil }, set: { if !$0 { deleteCandidate = nil } }),
@@ -115,27 +119,61 @@ struct TodayView: View {
     private var header: some View {
         VStack(spacing: Theme.Space.s) {
             WeekStrip(selection: Binding(get: { date }, set: { go(to: $0) }), busyDays: busyDays)
-            HStack {
-                Text(date, format: .dateTime.weekday(.wide).day().month(.wide))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                Spacer()
-                if let p = insights.snapshot.followThrough.percent {
-                    Text("Follow-through \(Int(p.rounded()))%")
-                        .font(.footnote)
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: Theme.Space.m) {
+                    dateCaption.fixedSize()
+                    Spacer(minLength: Theme.Space.m)
+                    followThroughCaption.fixedSize()
                 }
+                VStack(alignment: .leading, spacing: Theme.Space.xs) {
+                    dateCaption
+                    followThroughCaption
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
             .padding(.horizontal, Theme.Space.l)
+            TimelineView(.periodic(from: .now, by: 60)) { context in
+                let due = TaskAgenda.openTasks(items: items, areas: areas).filter {
+                    let bucket = TaskBucket.classify(dueDate: $0.dueDate, now: context.date)
+                    return bucket == .overdue || bucket == .today
+                }
+                if isToday && !due.isEmpty {
+                    NavigationLink {
+                        TasksView(initialFilter: .due)
+                    } label: {
+                        HStack(spacing: Theme.Space.s) {
+                            Image(systemName: "checklist")
+                            Text("\(due.count) \(due.count == 1 ? "task needs" : "tasks need") attention")
+                                .font(.subheadline)
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+                        }
+                        .frame(minHeight: 36)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.accentColor)
+                    .accessibilityHint("Show overdue tasks and tasks due today")
+                    .padding(.horizontal, Theme.Space.l)
+                }
+            }
         }
         .padding(.bottom, Theme.Space.s)
         .overlay(alignment: .bottom) { Divider() }
+    }
+
+    private var dateCaption: some View {
+        Text(date, format: .dateTime.weekday(.wide).day().month(.wide))
+            .font(.subheadline).foregroundStyle(.secondary)
+    }
+
+    @ViewBuilder
+    private var followThroughCaption: some View {
+        if let p = insights.snapshot.followThrough.percent {
+            Text("Follow-through \(Int(p.rounded()))%")
+                .font(.footnote).monospacedDigit().foregroundStyle(.secondary)
+        }
     }
 
     // MARK: Actions

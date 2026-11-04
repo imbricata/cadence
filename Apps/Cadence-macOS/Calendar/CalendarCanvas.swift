@@ -163,11 +163,10 @@ struct CalendarCanvas: View {
             range = (EventLayout.date(on: days[nd], minute: ns), EventLayout.date(on: days[nd], minute: ne))
         default: break
         }
-        // Overlapping blocks cascade (each later one sits over the right of the previous) so titles stay readable.
-        let laneW = laneCount == 1 ? colW : colW * max(0.5, 1 - 0.3 * CGFloat(laneCount - 1))
-        let step = laneCount == 1 ? 0 : (colW - laneW) / CGFloat(laneCount - 1)
+        // Overlapping blocks share the column width side by side, so none of them covers another.
+        let laneW = colW / CGFloat(max(1, laneCount))
         let rect = CGRect(
-            x: CGFloat(di) * colW + CGFloat(lane) * step + 1.5,
+            x: CGFloat(di) * colW + CGFloat(lane) * laneW + 1.5,
             y: CGFloat(s) / 60 * hourHeight + 1,
             width: laneW - 3,
             height: max(CGFloat(e - s) / 60 * hourHeight - 2, 18)

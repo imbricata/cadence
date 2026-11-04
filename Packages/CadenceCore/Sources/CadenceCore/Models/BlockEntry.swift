@@ -5,7 +5,12 @@ import SwiftData
 public final class BlockEntry: SyncedModel {
     public var id: UUID
     public var updatedAt: Date
-    public var isDeleted: Bool
+    @Attribute(originalName: "isDeleted") public var isTombstoned: Bool = false
+    // A stored `isDeleted` collides with Core Data's deletion flag. Preserve the sync-facing API.
+    public var isDeleted: Bool {
+        get { isTombstoned }
+        set { isTombstoned = newValue }
+    }
 
     public var blockLogId: UUID
     public var itemId: UUID?
@@ -23,7 +28,7 @@ public final class BlockEntry: SyncedModel {
     ) {
         self.id = id
         self.updatedAt = updatedAt
-        self.isDeleted = isDeleted
+        self.isTombstoned = isDeleted
         self.blockLogId = blockLogId
         self.itemId = itemId
         self.outcome = outcome

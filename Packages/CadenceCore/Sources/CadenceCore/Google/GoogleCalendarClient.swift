@@ -57,10 +57,14 @@ public struct CalendarEvent: Identifiable, Codable, Sendable {
     public var isAllDay: Bool
     public var isCadenceBlock: Bool
 
-    /// A zero-length timed event (e.g. an assignment due date). Shown as a marker, never as a block.
-    public var isDeadline: Bool { !isAllDay && end <= start }
+    /// A timed event with no real length (e.g. an assignment due date). Shown as a marker, never as a block.
+    /// Under a minute, not just zero: Blackboard exports some deadlines as start + 1 second.
+    public var isDeadline: Bool { !isAllDay && end.timeIntervalSince(start) < 60 }
+    /// A timed event that runs the whole day (e.g. "Asynchronous", 00:00-23:59). It would otherwise
+    /// squeeze every other event of that day into a narrow lane.
+    public var spansWholeDay: Bool { !isAllDay && end.timeIntervalSince(start) >= 23 * 3600 }
     /// Belongs in the all-day strip rather than the hour grid.
-    public var isAllDayLike: Bool { isAllDay || isDeadline }
+    public var isAllDayLike: Bool { isAllDay || isDeadline || spansWholeDay }
 
     public init(id: String, summary: String, start: Date, end: Date, calendarId: String, isAllDay: Bool = false, isCadenceBlock: Bool = false) {
         self.id = id; self.summary = summary; self.start = start; self.end = end

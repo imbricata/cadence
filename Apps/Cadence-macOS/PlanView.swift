@@ -64,24 +64,32 @@ struct PlanView: View {
         .navigationTitle(title)
         .navigationSubtitle(subtitle)
         .toolbar {
-            ToolbarItemGroup(placement: .navigation) {
-                Button { shift(-1) } label: { Label("Previous", systemImage: "chevron.left").labelStyle(.iconOnly) }
-                    .help("Previous (⌘←)")
-                Button("Today") { goToday() }
-                    .help("Go to today (⌘T)")
-                Button { shift(1) } label: { Label("Next", systemImage: "chevron.right").labelStyle(.iconOnly) }
-                    .help("Next (⌘→)")
+            // Title and date range sit alone on the left; everything else is grouped on the
+            // right as: [‹ Today ›]  [Day | Week]  [+]  [backlog].
+            ToolbarItem(placement: .primaryAction) {
+                ControlGroup {
+                    Button { shift(-1) } label: { Label("Previous", systemImage: "chevron.left") }
+                        .help("Previous (⌘←)")
+                    Button("Today") { goToday() }
+                        .help("Go to today (⌘T)")
+                    Button { shift(1) } label: { Label("Next", systemImage: "chevron.right") }
+                        .help("Next (⌘→)")
+                }
             }
-            ToolbarItem(placement: .principal) {
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+            ToolbarItem(placement: .primaryAction) {
                 Picker("View", selection: $modeRaw) {
                     ForEach(PlanMode.allCases) { Text($0.rawValue).tag($0.rawValue) }
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 140)
+                .help("Switch between day and week")
             }
-            ToolbarItemGroup(placement: .primaryAction) {
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+            ToolbarItem(placement: .primaryAction) {
                 Button { newBlock() } label: { Label("New Block", systemImage: "plus") }
                     .help("New block (⇧⌘N)")
+            }
+            ToolbarItem(placement: .primaryAction) {
                 Button { showBacklog.toggle() } label: { Label("Backlog", systemImage: "sidebar.right") }
                     .help("Show or hide the backlog (⌥⌘I)")
             }

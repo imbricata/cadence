@@ -5,7 +5,12 @@ import SwiftData
 public final class InboxNote: SyncedModel {
     public var id: UUID
     public var updatedAt: Date
-    public var isDeleted: Bool
+    @Attribute(originalName: "isDeleted") public var isTombstoned: Bool = false
+    // A stored `isDeleted` collides with Core Data's deletion flag. Preserve the sync-facing API.
+    public var isDeleted: Bool {
+        get { isTombstoned }
+        set { isTombstoned = newValue }
+    }
 
     public var rawText: String
     public var createdAt: Date
@@ -29,7 +34,7 @@ public final class InboxNote: SyncedModel {
     ) {
         self.id = id
         self.updatedAt = updatedAt
-        self.isDeleted = isDeleted
+        self.isTombstoned = isDeleted
         self.rawText = rawText
         self.createdAt = createdAt
         self.state = state

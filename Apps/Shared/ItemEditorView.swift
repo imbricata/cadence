@@ -11,7 +11,7 @@ struct ItemEditorView: View {
 
     let item: Item?
 
-    @State private var areaId: UUID
+    @State private var areaId: UUID?
     @State private var title: String
     @State private var kind: ItemKind
     @State private var status: ItemStatus
@@ -20,8 +20,9 @@ struct ItemEditorView: View {
     @State private var fullVersion: String
     @State private var easyVersion: String
     @State private var notes: String
+    @FocusState private var titleFocused: Bool
 
-    init(areaId: UUID, item: Item? = nil) {
+    init(areaId: UUID? = nil, item: Item? = nil) {
         self.item = item
         _areaId = State(initialValue: item?.areaId ?? areaId)
         _title = State(initialValue: item?.title ?? "")
@@ -49,6 +50,7 @@ struct ItemEditorView: View {
                 }
                 Section {
                     TextField("Title", text: $title)
+                        .focused($titleFocused)
                     Picker("Kind", selection: $kind) {
                         Text("Task").tag(ItemKind.task)
                         Text("Activity").tag(ItemKind.activity)
@@ -93,8 +95,13 @@ struct ItemEditorView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", action: save).disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
+                    Button("Save", action: save)
+                        .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !areas.contains { $0.id == areaId })
                 }
+            }
+            .onAppear {
+                if areaId == nil { areaId = areas.first?.id }
+                if item == nil { titleFocused = true }
             }
         }
         #if os(macOS)
@@ -105,7 +112,8 @@ struct ItemEditorView: View {
     }
 
     private func save() {
-        let t = title.trimmingCharacters(in: .whitespaces)
+        let t = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty, let areaId, areas.contains(where: { $0.id == areaId }) else { return }
         let due: Date? = (kind == .task && hasDue) ? Calendar.current.startOfDay(for: dueDate) : nil
         func opt(_ s: String) -> String? { s.trimmingCharacters(in: .whitespaces).isEmpty ? nil : s }
         if let item {

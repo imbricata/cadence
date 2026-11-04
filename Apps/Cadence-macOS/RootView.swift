@@ -3,7 +3,7 @@ import SwiftData
 import CadenceCore
 
 enum SidebarItem: Hashable {
-    case plan, inbox, insights
+    case plan, tasks, inbox, insights
     case area(UUID)
 }
 
@@ -68,6 +68,7 @@ struct RootView: View {
         List(selection: $selection) {
             Section {
                 Label("Plan", systemImage: "calendar").tag(SidebarItem.plan)
+                Label("Tasks", systemImage: "checklist").tag(SidebarItem.tasks)
                 Label("Inbox", systemImage: "tray")
                     .badge(inboxBadge)
                     .tag(SidebarItem.inbox)
@@ -117,6 +118,7 @@ struct RootView: View {
     private var detail: some View {
         switch selection {
         case .plan, .none: PlanView()
+        case .tasks: TasksView()
         case .inbox: InboxView()
         case .insights: InsightsView()
         case .area(let id):
@@ -136,6 +138,7 @@ struct RootView: View {
     private static var initialSelection: SidebarItem {
         #if DEBUG
         switch DemoMode.arg("CadenceSection") {
+        case "tasks": return .tasks
         case "inbox": return .inbox
         case "insights": return .insights
         default: break

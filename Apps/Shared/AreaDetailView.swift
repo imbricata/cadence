@@ -103,10 +103,13 @@ struct AreaDetailView: View {
         .navigationTitle(area.name)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button { showingNew = true } label: { Label("Add Item", systemImage: "plus") }
+                Button { showingEdit = true } label: { Label("Edit Area", systemImage: "pencil") }
+                    .help("Edit area")
             }
-            ToolbarItem(placement: .secondaryAction) {
-                Button { showingEdit = true } label: { Label("Edit Area", systemImage: "slider.horizontal.3") }
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+            ToolbarItem(placement: .primaryAction) {
+                Button { showingNew = true } label: { Label("Add Item", systemImage: "plus") }
+                    .help("Add item")
             }
         }
         .sheet(isPresented: $showingNew) { ItemEditorView(areaId: area.id) }

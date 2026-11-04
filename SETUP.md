@@ -61,9 +61,20 @@ The first time you open either app, a short welcome appears. Every step has **Sk
 
 ## 8. Keeping it running
 
-22. iPhone apps installed with a free account **expire after 7 days**. Reinstall from Xcode weekly. Your data survives (same bundle id keeps the local store) and is also synced to Google Drive's `appDataFolder`, so signing in again restores everything.
+22. iPhone apps installed with a free Apple Personal Team **expire after 7 days**; Apple also limits that team to **3 apps per device**. Reinstalling in place, without deleting Cadence first, can preserve the local store when the signed app identity and bundle ID remain the same. Deleting the app removes local data. Google Drive sync can restore data after signing in again, but it is not a replacement for a backup or export.
 23. If Google signs you out, a "Google disconnected. Reconnect" bar appears. Tap Reconnect; no local data is lost.
 24. **Update both devices together** after pulling a new version: older builds can't read newer sync files, and Cadence refuses to overwrite a sync file it can't read.
+
+## 9. Avoiding the weekly Xcode reinstall
+
+The repository can make an unsigned IPA for an installer to sign:
+
+1. From any directory, run `bash /path/to/cadence/scripts/package-ios.sh` (from the repo root, `bash scripts/package-ios.sh`). The script runs XcodeGen and a Release generic iOS build with signing disabled, then writes `build/Cadence.ipa`.
+2. The IPA is **not directly installable**. AltStore Classic or SideStore must sign it with your Apple ID before installing it. The installer, not this script, handles signing.
+3. For a Mac, **AltStore Classic is the recommended option**: install AltStore using AltServer, import `Cadence.ipa` from its My Apps tab, then keep AltServer running and reachable by Wi-Fi or USB for refreshes. Background refresh attempts are not guaranteed. See [AltStore's macOS installation guide](https://faq.altstore.io/altstore-classic/how-to-install-altstore-macos) and [its refresh guide](https://faq.altstore.io/altstore-classic/your-altstore).
+4. **SideStore is the alternative**: complete the initial computer setup using `iloader`. Later on-phone refreshes require Wi-Fi and **LocalDevVPN** to be enabled. See [SideStore prerequisites](https://docs.sidestore.io/docs/installation/prerequisites) and the [SideStore FAQ](https://docs.sidestore.io/docs/faq). Check the current installer documentation for device and OS compatibility; it is not guaranteed here.
+5. Both approaches still use Apple's free Personal Team provisioning: the 7-day expiry and 3-app device limit remain, and AltStore/SideStore itself uses one of those slots. Neither is a permanent free native-provisioning solution. A paid Apple Developer membership is the separate $99/year option if that is preferable. [Apple's limits](https://developer.apple.com/help/account/basics/about-your-developer-account/).
+6. Before switching installers, sync or export anything important and use the same Apple ID. An installer may rewrite the bundle ID, creating a separate installation rather than updating the existing app. Do not delete the current Cadence app until the new installation opens and its data has been verified. A PWA would require a separate web app and is out of scope here.
 
 ## Notes
 

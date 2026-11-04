@@ -29,7 +29,11 @@ public enum OpenRouterError: Error, LocalizedError {
     }
 }
 
-public struct OpenRouterClient: Sendable {
+public protocol InboxSorting: Sendable {
+    func sort(_ request: InboxSortRequest, apiKey: String, model: String) async throws -> (InboxSortResult, Int, Int)
+}
+
+public struct OpenRouterClient: InboxSorting {
     public init() {}
 
     private static let endpoint = URL(string: "https://openrouter.ai/api/v1/chat/completions")!

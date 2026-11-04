@@ -28,5 +28,8 @@ extension View {
             .environment(s.inbox)
             .environment(s.insights)
             .modelContainer(s.store.container)
+            #if DEBUG
+            .preferredColorScheme(DemoMode.isEnabled ? DemoMode.colorScheme : nil)
+            #endif
     }
 }

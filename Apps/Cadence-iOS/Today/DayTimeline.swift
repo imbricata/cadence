@@ -122,10 +122,9 @@ struct DayTimeline: View {
     private func block(_ p: PositionedEvent, width: CGFloat) -> some View {
         let area = areaByCalendar[p.event.calendarId]
         let editable = area != nil && area?.isClassesCalendar == false
-        let laneW = p.laneCount == 1 ? width : width * max(0.5, 1 - 0.3 * CGFloat(p.laneCount - 1))
-        let step = p.laneCount == 1 ? 0 : (width - laneW) / CGFloat(p.laneCount - 1)
+        let laneW = width / CGFloat(max(1, p.laneCount))
         let h = max(CGFloat(p.endMinute - p.startMinute) / 60 * hourHeight - 2, 22)
-        let rect = CGRect(x: gutter + CGFloat(p.lane) * step, y: CGFloat(p.startMinute) / 60 * hourHeight + 1, width: laneW, height: h)
+        let rect = CGRect(x: gutter + CGFloat(p.lane) * laneW, y: CGFloat(p.startMinute) / 60 * hourHeight + 1, width: laneW, height: h)
 
         TimelineBlock(positioned: p, area: area, info: info.info(for: p.event), size: rect.size)
             .contentShape(Rectangle())
@@ -191,7 +190,6 @@ struct TimelineBlock: View {
     private var isClasses: Bool { area?.isClassesCalendar ?? true }
     private var color: AreaColor { area?.color ?? .classes }
     private var state: BlockLogState { info?.state ?? .unlogged }
-    private var covered: Bool { positioned.laneCount > 1 && positioned.lane < positioned.laneCount - 1 }
     private var isPastUnlogged: Bool { !isClasses && event.end < .now && state == .unlogged }
 
     var body: some View {
@@ -211,6 +209,7 @@ struct TimelineBlock: View {
             }
         }
         .frame(width: size.width, height: size.height)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.block, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: Theme.Radius.block, style: .continuous)
                 .strokeBorder(isPastUnlogged ? color.stroke : .clear, style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
@@ -222,17 +221,16 @@ struct TimelineBlock: View {
     @ViewBuilder
     private var content: some View {
         let title = event.summary.isEmpty ? (area?.name ?? "") : event.summary
-        if covered {
-            Text(title).font(.subheadline.weight(.semibold)).lineLimit(1)
-        } else if size.height < 40 {
+        if size.height < 40 {
             HStack(spacing: 6) {
-                Text(title).font(.subheadline.weight(.semibold)).lineLimit(1)
-                Text(event.start, format: .dateTime.hour().minute()).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                Text(title).font(.subheadline.weight(.semibold)).lineLimit(1).layoutPriority(1)
+                Text(event.start, format: .dateTime.hour().minute()).font(.caption).foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
             }
         } else {
             VStack(alignment: .leading, spacing: 1) {
                 Text(title).font(.subheadline.weight(.semibold)).lineLimit(2)
-                Text(Format.timeRange(event.start, event.end)).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                Text(size.width < 160 ? event.start.formatted(date: .omitted, time: .shortened) : Format.timeRange(event.start, event.end))
+                    .font(.caption).foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
                 let lines = max(0, Int((size.height - 10 - 36) / 15))
                 if lines > 0, let titles = info?.itemTitles {
                     ForEach(titles.prefix(min(2, lines)), id: \.self) { Text($0).font(.caption).foregroundStyle(.secondary).lineLimit(1) }

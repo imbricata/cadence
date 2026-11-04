@@ -17,10 +17,9 @@ public func deleteInboxNote(_ store: AppStore, _ note: InboxNote) {
     store.save()
 }
 
-/// Deleting a card from the Inbox removes the item it created, too.
+/// Inbox is capture history. Removing a note must not delete a task or a reused activity.
 @MainActor
 public func deleteInboxCard(_ store: AppStore, _ note: InboxNote) {
-    if let id = note.resultingItemId, let item = item(withId: id, in: store.context) { deleteItem(store, item) }
     deleteInboxNote(store, note)
 }
 
@@ -34,7 +33,10 @@ public func markForResort(_ store: AppStore, _ note: InboxNote) {
 
 @MainActor
 public func completeManually(_ store: AppStore, _ note: InboxNote, itemId: UUID) {
+    guard !note.isDeleted else { return }
     note.resultingItemId = itemId
+    note.isLowConfidence = false
+    note.failureCount = 0
     note.state = .sorted
     note.sortedAt = .now
     note.updatedAt = .now

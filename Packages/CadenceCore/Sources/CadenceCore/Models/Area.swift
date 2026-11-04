@@ -5,7 +5,12 @@ import SwiftData
 public final class Area: SyncedModel {
     public var id: UUID
     public var updatedAt: Date
-    public var isDeleted: Bool
+    @Attribute(originalName: "isDeleted") public var isTombstoned: Bool = false
+    // A stored `isDeleted` collides with Core Data's deletion flag. Preserve the sync-facing API.
+    public var isDeleted: Bool {
+        get { isTombstoned }
+        set { isTombstoned = newValue }
+    }
 
     public var name: String
     public var colorHex: String
@@ -31,7 +36,7 @@ public final class Area: SyncedModel {
     ) {
         self.id = id
         self.updatedAt = updatedAt
-        self.isDeleted = isDeleted
+        self.isTombstoned = isDeleted
         self.name = name
         self.colorHex = colorHex
         self.symbolName = symbolName

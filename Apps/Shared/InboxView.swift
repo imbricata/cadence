@@ -55,7 +55,7 @@ struct InboxView: View {
                             .listRowInsets(EdgeInsets(top: 3, leading: Theme.Space.l, bottom: 3, trailing: Theme.Space.l))
                             #if os(iOS)
                             .swipeActions(edge: .trailing) {
-                                Button(role: .destructive) { deleteInboxCard(store, note) } label: { Label("Delete", systemImage: "trash") }
+                                Button(role: .destructive) { deleteInboxCard(store, note) } label: { Label("Remove Note", systemImage: "trash") }
                             }
                             #endif
                     }
@@ -102,7 +102,7 @@ struct InboxView: View {
     private var keyHint: some View {
         HStack(spacing: Theme.Space.s) {
             Image(systemName: "sparkles").foregroundStyle(.secondary)
-            Text("Add an OpenRouter key in Settings to sort notes.").font(.footnote).foregroundStyle(.secondary)
+            Text("Notes are saved. Sort manually, or add an AI key in Settings.").font(.footnote).foregroundStyle(.secondary)
             Spacer()
             #if os(macOS)
             SettingsLink { Text("Settings") }.controlSize(.small)

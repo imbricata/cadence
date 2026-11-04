@@ -6,70 +6,98 @@ import Observation
 @Observable
 public final class InboxService {
     private let store: AppStore
-    private let client = OpenRouterClient()
+    private let client: any InboxSorting
+    private let keyProvider: () -> String?
+    private let capReached: () -> Bool
+    private let recordUsage: (String, Int, Int) -> Void
+    private var settingsRevision = 0
 
     public private(set) var isProcessing = false
+    public private(set) var processingNoteId: UUID?
 
-    public init(store: AppStore) {
+    public init(
+        store: AppStore,
+        client: any InboxSorting = OpenRouterClient(),
+        keyProvider: @escaping () -> String? = { OpenRouterKeychain.key() },
+        capReached: @escaping () -> Bool = { CostTracker.isOverCap() },
+        recordUsage: @escaping (String, Int, Int) -> Void = { CostTracker.record(model: $0, inputTokens: $1, outputTokens: $2) }
+    ) {
         self.store = store
+        self.client = client
+        self.keyProvider = keyProvider
+        self.capReached = capReached
+        self.recordUsage = recordUsage
     }
 
-    public var hasKey: Bool { OpenRouterKeychain.key() != nil }
-    public var currentKey: String { OpenRouterKeychain.key() ?? "" }
+    public var hasKey: Bool { _ = settingsRevision; return !(keyProvider()?.isEmpty ?? true) }
+    public var currentKey: String { _ = settingsRevision; return keyProvider() ?? "" }
     public var monthCostUSD: Double { CostTracker.monthCostUSD }
     public var monthlyCapUSD: Double { OpenRouterSettings.monthlyCapUSD }
     public var model: String { OpenRouterSettings.model }
-    public var isOverCap: Bool { CostTracker.isOverCap() }
+    public var isOverCap: Bool { _ = settingsRevision; return capReached() }
 
     public func setKey(_ key: String) {
         OpenRouterKeychain.setKey(key)
+        settingsRevision &+= 1
     }
     public func setModel(_ model: String) {
         OpenRouterSettings.model = model
+        settingsRevision &+= 1
     }
     public func setCap(_ cap: Double) {
         OpenRouterSettings.monthlyCapUSD = cap
+        settingsRevision &+= 1
     }
 
     public func processPending() async {
-        guard let key = OpenRouterKeychain.key(), !key.isEmpty else { return }
-        guard !CostTracker.isOverCap() else { return }
+        // Sending a note, opening Inbox and foregrounding can all arrive during a request.
+        guard !isProcessing, hasKey, !isOverCap, !activeAreas().isEmpty else { return }
         isProcessing = true
-        defer { isProcessing = false }
+        defer { isProcessing = false; processingNoteId = nil }
         purgeOldRawText(store)
-        let pending = fetchAll(InboxNote.self, in: store.context).filter { !$0.isDeleted && $0.state == .pending }
-        for note in pending {
+        var attempted: Set<UUID> = []
+        while !Task.isCancelled, !isOverCap, !activeAreas().isEmpty,
+              let key = keyProvider(), !key.isEmpty {
+            // Pick again after each await so newly captured notes are drained in this run.
+            guard let note = fetchAll(InboxNote.self, in: store.context)
+                .filter({ !$0.isDeleted && $0.state == .pending && !attempted.contains($0.id) })
+                .min(by: { $0.createdAt < $1.createdAt }) else { break }
+            attempted.insert(note.id)
+            processingNoteId = note.id
             await sort(note, key: key)
         }
     }
 
     public func resort(_ note: InboxNote) async {
+        guard !note.isDeleted, !note.rawText.isEmpty, note.id != processingNoteId else { return }
         markForResort(store, note)
-        if let key = OpenRouterKeychain.key() {
-            await sort(note, key: key)
-        }
+        await processPending()
     }
 
     // MARK: - Sorting
 
     private func sort(_ note: InboxNote, key: String) async {
+        let revision = note.updatedAt
+        func isCurrent() -> Bool {
+            !Task.isCancelled && !note.isDeleted && note.state == .pending && note.updatedAt == revision
+        }
+        guard isCurrent(), !note.rawText.isEmpty else { return }
         let request = makeRequest(for: note)
-        do {
-            let (result, inTokens, outTokens) = try await client.sort(request, apiKey: key, model: OpenRouterSettings.model)
-            CostTracker.record(model: OpenRouterSettings.model, inputTokens: inTokens, outputTokens: outTokens)
-            if try apply(result, to: note) { return }
-        } catch {
-            // fallthrough to retry
+        let model = OpenRouterSettings.model
+        for _ in 0..<2 {
+            guard isCurrent(), !isOverCap else { return }
+            do {
+                let (result, inTokens, outTokens) = try await client.sort(request, apiKey: key, model: model)
+                recordUsage(model, inTokens, outTokens)
+                settingsRevision &+= 1
+                // A manual edit, deletion or sync during the request takes precedence.
+                guard isCurrent() else { return }
+                if try apply(result, to: note) { return }
+            } catch {
+                guard isCurrent() else { return }
+            }
         }
-        // retry once
-        do {
-            let (result, inTokens, outTokens) = try await client.sort(request, apiKey: key, model: OpenRouterSettings.model)
-            CostTracker.record(model: OpenRouterSettings.model, inputTokens: inTokens, outputTokens: outTokens)
-            if try apply(result, to: note) { return }
-        } catch {
-            // fallthrough to failure
-        }
-        fail(note)
+        if isCurrent() { fail(note) }
     }
 
     private func fail(_ note: InboxNote) {
@@ -93,7 +121,14 @@ public final class InboxService {
         let dueDate = result.dueDate.flatMap(Self.parseDateOnly)
         let itemId: UUID
 
-        if result.kind == .activity,
+        if let previousId = note.resultingItemId, let previous = item(withId: previousId, in: store.context),
+           !previous.isDeleted, previous.kind == .task {
+            // Re-sorting corrects the existing item, rather than leaving duplicate tasks behind.
+            // Activities can be shared by other notes and logs; never repurpose them here.
+            updateItem(store, previous, title: title, kind: result.kind, areaId: area.id,
+                       dueDate: .some(result.kind == .task ? dueDate : nil))
+            itemId = previous.id
+        } else if result.kind == .activity,
            let match = result.matchesExistingActivityId,
            let matchId = UUID(uuidString: match),
            let existing = activities(forArea: area.id, in: store.context).first(where: { $0.id == matchId }) {

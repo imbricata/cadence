@@ -30,7 +30,8 @@ public enum EventLayout {
         return events
             .filter { e in
                 guard e.isAllDayLike else { return false }
-                return e.isAllDay ? (e.start < interval.end && e.end > interval.start) : (e.start >= interval.start && e.start < interval.end)
+                if e.isAllDay || e.spansWholeDay { return e.start < interval.end && e.end > interval.start }
+                return e.start >= interval.start && e.start < interval.end
             }
             .sorted { ($0.isDeadline ? 1 : 0, $0.start, $0.summary) < ($1.isDeadline ? 1 : 0, $1.start, $1.summary) }
     }

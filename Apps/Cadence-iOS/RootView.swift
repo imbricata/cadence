@@ -3,7 +3,7 @@ import SwiftData
 import CadenceCore
 
 enum AppTab: String, CaseIterable {
-    case today, inbox, areas
+    case today, tasks, inbox, areas
 }
 
 struct RootView: View {
@@ -21,6 +21,9 @@ struct RootView: View {
             TodayView()
                 .tabItem { Label("Today", systemImage: "calendar") }
                 .tag(AppTab.today)
+            NavigationStack { TasksView() }
+                .tabItem { Label("Tasks", systemImage: "checklist") }
+                .tag(AppTab.tasks)
             InboxView()
                 .tabItem { Label("Inbox", systemImage: "tray") }
                 .badge(failedCount)
