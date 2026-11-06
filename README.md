@@ -39,4 +39,4 @@ xcodebuild -project Cadence.xcodeproj -scheme CadenceiOS -destination 'generic/p
 xcodebuild -project Cadence.xcodeproj -scheme CadenceCoreTests test
 ```
 
-`SETUP.md` covers Google Cloud, signing, secrets and free automatic-renewal options for iPhone (AltStore Classic / SideStore). `bash scripts/package-ios.sh` produces an unsigned `build/Cadence.ipa` for those installers. `TESTING.md` is the manual check that needs real accounts. `DECISIONS.md` logs judgment calls. `PLAN.md` is the historical overhaul plan.
+`SETUP.md` covers Google Cloud, signing, secrets and free automatic-renewal options for iPhone (Sideloadly / AltStore Classic / SideStore). `bash scripts/package-ios.sh` produces an unsigned `build/Cadence.ipa` for those installers. `TESTING.md` is the manual check that needs real accounts. `DECISIONS.md` logs architectural and product judgment calls.

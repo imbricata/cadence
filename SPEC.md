@@ -1,31 +1,7 @@
 # Cadence: Product & Technical Spec
 
-> Working title. A personal system for planning days around areas of life, filling time blocks with tasks and activities, and seeing honest, minimal scores of what actually happens.
-> Single user (me). Native macOS + iOS apps, installed from Xcode with a **free Apple ID (Personal Team)**. Not for the App Store.
-
----
-
-## 0. How to work on this (instructions for the coding agent)
-
-**Build the entire app in one uninterrupted run. Do not stop to ask me questions or wait for approval.**
-
-- Read this whole file first. Then work through the phases in Section 11 in order, without pausing between them.
-- When something is ambiguous, choose the most reasonable option, keep going, and record the choice in `DECISIONS.md` (one line each).
-- After each phase: build **both** apps with `xcodebuild` and run the unit tests. Fix all errors before moving on. Never leave the project in a non-compiling state at the end.
-- Use **XcodeGen** (`project.yml`) to define the Xcode project. Never hand-edit `.pbxproj`. Regenerate with `xcodegen generate` after changing targets/files.
-- **Keep token usage low:**
-  - Pipe builds through `xcbeautify` (or use `-quiet`) and only look at errors/warnings, never full build logs.
-  - Don't re-read files you just wrote. Read only the files you need.
-  - Prefer small focused files over huge ones, so edits are cheap.
-- **Toolchain flexibility:** don't hardcode Xcode/SDK versions beyond the minimum deployment targets. Check what's installed (`xcodebuild -version`, `xcodebuild -showsdks`) and use only APIs available in that SDK. If unsure an API exists, use a well-established alternative rather than guessing. Use Swift 6 language mode if it compiles cleanly; otherwise Swift 5 mode is acceptable.
-- Never commit secrets. Google client ID and similar go in a git-ignored `Secrets.xcconfig`; provide `Secrets.example.xcconfig`. The OpenRouter key is entered in the app's Settings at runtime, not built in.
-- Commit to git at the end of each phase with a clear message.
-- **At the very end**, write:
-  - `SETUP.md`: everything I must do by hand, as plain numbered steps (Google Cloud project + OAuth client, consent screen to "In production", filling `Secrets.xcconfig`, signing with my Personal Team, installing on iPhone and Mac, reinstalling weekly, entering the OpenRouter key).
-  - `README.md`: what the app is and how the code is organized (short).
-  - A final summary in chat: what works, what's untested, anything I should check first.
-- **Finally, push to my GitHub** using my git push skill. Use a **private** repo named `cadence` (create it if it doesn't exist). Before pushing, double-check that `Secrets.xcconfig` and any keys/tokens are git-ignored and not in the history.
-- UI quality bar: this should feel like a first-party Apple app. See Section 9. Restraint over features.
+> A personal system for planning days around areas of life, filling time blocks with tasks and activities, and seeing honest, minimal scores of what actually happens.
+> Native macOS + iOS apps, built with Swift, SwiftUI, and SwiftData.
 
 ---
 

@@ -22,3 +22,7 @@ Package.resolved
 
 # macOS
 *.dSYM
+
+# Local agent config & scratch
+opencode.json
+PLAN.md
